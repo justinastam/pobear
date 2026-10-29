@@ -1,0 +1,18 @@
+args: scrape {{base}}/x --cache --cache-ttl 1h --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/x"
+        ]
+      },
+      "fetch": {
+        "use": "local",
+        "cache": {
+          "ttl": "1h"
+        }
+      }
+    }
+stderr: ""
+exit: 0

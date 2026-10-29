@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/Decodo/pobear/pkg/exitcode"
+	"github.com/Decodo/pobear/pkg/jobspec"
 )
 
 type cliError struct {
@@ -76,6 +77,8 @@ type commonFlags struct {
 	out              string
 	bare             bool
 	ladder           bool
+	cache            bool
+	cacheTTL         string
 	printSpec        bool
 	printSpecVerbose bool
 	failOnEmpty      bool
@@ -104,6 +107,8 @@ func registerCommonFlags(cmd *cobra.Command, f *commonFlags, defaultRPS int) {
 	flags.BoolVar(&f.bare, "bear", false, "alias for --bare (it wouldn't be pobear without one)")
 	_ = flags.MarkHidden("bear")
 	flags.BoolVar(&f.ladder, "ladder", false, "escalate through configured tiers (local, then proxy, then provider) when blocked or rate-limited")
+	flags.BoolVar(&f.cache, "cache", false, "serve repeat fetches from the on-disk response cache ($POBEAR_CACHE_DIR, default ~/.pobear/cache), storing fresh successful ones")
+	flags.StringVar(&f.cacheTTL, "cache-ttl", jobspec.DefaultCacheTTL, "how long a cached response stays fresh; requires --cache")
 	flags.BoolVar(&f.printSpec, "print-spec", false, "print the job spec, don't run it")
 	flags.BoolVar(&f.printSpecVerbose, "print-spec-verbose", false, "like --print-spec, but every field is shown fully resolved")
 	flags.BoolVar(&f.failOnEmpty, "fail-on-empty", false, "exit non-zero when every fetched item extracted nothing")
@@ -138,4 +143,14 @@ func resolveProfile(f *commonFlags, fetchUse string) (string, *cliError) {
 		return "", newCLIError(exitcode.UsageError, "--profile requires --proxy or the local tier, not --provider")
 	}
 	return "", nil
+}
+
+func resolveCacheTTL(f *commonFlags) (string, *cliError) {
+	if f.wasSet != nil && f.wasSet("cache-ttl") && !f.cache {
+		return "", newCLIError(exitcode.UsageError, "--cache-ttl requires --cache")
+	}
+	if !f.cache {
+		return "", nil
+	}
+	return f.cacheTTL, nil
 }

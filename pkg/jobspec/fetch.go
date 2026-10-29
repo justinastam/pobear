@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/Decodo/pobear/pkg/utils"
 )
@@ -13,7 +14,7 @@ func parseFetch(root map[string]any) (Fetch, *ValidationError) {
 	if !ok {
 		return Fetch{}, utils.Errorf("fetch", "`fetch` is required")
 	}
-	m, err := utils.AsMapping(raw, "fetch", "use", "name", "template", "proxy", "profile", "options", "timeout", "noRedirects", "headers", "ladder")
+	m, err := utils.AsMapping(raw, "fetch", "use", "name", "template", "proxy", "profile", "options", "timeout", "noRedirects", "headers", "ladder", "cache")
 	if err != nil {
 		return Fetch{}, err
 	}
@@ -70,7 +71,32 @@ func parseFetch(root map[string]any) (Fetch, *ValidationError) {
 		return Fetch{}, err
 	}
 
+	if err := parseFetchCache(m, &fetch); err != nil {
+		return Fetch{}, err
+	}
+
 	return fetch, nil
+}
+
+func parseFetchCache(m map[string]any, fetch *Fetch) *ValidationError {
+	raw, ok := m["cache"]
+	if !ok {
+		return nil
+	}
+	cm, err := utils.AsMapping(raw, "fetch.cache", "ttl")
+	if err != nil {
+		return err
+	}
+	ttl := utils.GetString(cm, "ttl", DefaultCacheTTL)
+	d, perr := time.ParseDuration(ttl)
+	if perr != nil {
+		return utils.Errorf("fetch.cache.ttl", "`fetch.cache.ttl` is not a valid duration: %q", ttl)
+	}
+	if d <= 0 {
+		return utils.Errorf("fetch.cache.ttl", "`fetch.cache.ttl` must be > 0, got %q", ttl)
+	}
+	fetch.Cache = &FetchCache{TTL: ttl}
+	return nil
 }
 
 func parseFetchProfile(m map[string]any, use string, fetch *Fetch) *ValidationError {

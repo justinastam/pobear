@@ -1,0 +1,5 @@
+args: scrape {{base}}/x --cache-ttl 1h
+stdout: ""
+stderr: |
+    pobear: --cache-ttl requires --cache
+exit: 3

@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local, cache: {ttl: 1h, dir: /tmp/x}}
+wantErr: true
+wantField: fetch.cache.dir
+wantMessage: "unknown field `fetch.cache.dir`"

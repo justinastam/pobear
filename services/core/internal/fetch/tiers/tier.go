@@ -5,4 +5,5 @@ type Result struct {
 	Body     []byte
 	FinalURL string
 	Tier     string
+	Cached   bool
 }

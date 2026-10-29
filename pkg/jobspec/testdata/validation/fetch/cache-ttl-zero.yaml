@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local, cache: {ttl: 0s}}
+wantErr: true
+wantField: fetch.cache.ttl
+wantMessage: "`fetch.cache.ttl` must be > 0, got \"0s\""

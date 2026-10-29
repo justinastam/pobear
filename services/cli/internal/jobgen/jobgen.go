@@ -33,6 +33,8 @@ type Input struct {
 	Timeout     string
 	NoRedirects bool
 	Headers     map[string]string
+	Cache       bool
+	CacheTTL    string
 	Stages      []jobspec.Stage
 	Concurrency *int
 	RPS         *int
@@ -124,6 +126,13 @@ func buildFetchDoc(in Input) map[string]any {
 	if len(in.Headers) > 0 {
 		fetch["headers"] = in.Headers
 	}
+	if in.Cache {
+		cache := map[string]any{}
+		if in.CacheTTL != "" {
+			cache["ttl"] = in.CacheTTL
+		}
+		fetch["cache"] = cache
+	}
 	return fetch
 }
 
@@ -207,6 +216,11 @@ type minimalFetch struct {
 	Timeout     *string           `json:"timeout,omitempty"`
 	NoRedirects *bool             `json:"noRedirects,omitempty"`
 	Headers     map[string]string `json:"headers,omitempty"`
+	Cache       *minimalCache     `json:"cache,omitempty"`
+}
+
+type minimalCache struct {
+	TTL *string `json:"ttl,omitempty"`
 }
 
 type minimalLimits struct {
@@ -277,7 +291,15 @@ func minimalFetchFrom(r, d jobspec.Fetch) minimalFetch {
 		Timeout:     diffString(r.Timeout, d.Timeout),
 		NoRedirects: diffBool(r.NoRedirects, d.NoRedirects),
 		Headers:     diffHeaders(r.Headers, d.Headers),
+		Cache:       minimalCacheFrom(r.Cache),
 	}
+}
+
+func minimalCacheFrom(r *jobspec.FetchCache) *minimalCache {
+	if r == nil {
+		return nil
+	}
+	return &minimalCache{TTL: diffString(r.TTL, jobspec.DefaultCacheTTL)}
 }
 
 func minimalLimitsFrom(r, d jobspec.Limits) *minimalLimits {

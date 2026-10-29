@@ -78,6 +78,17 @@ pobear scrape urls.txt --extract markdown --out pages.ndjson
 
 This is useful when another step in your workflow already produces the URLs. Blank lines and lines beginning with `#` are ignored.
 
+### Iterate on selectors without refetching
+
+Add `--cache` while you tune selectors. The first run fetches and stores each page; later runs with the same fetch settings read it from disk instead of the network, so they're instant and don't spend proxy or provider credits:
+
+```sh
+pobear scrape https://books.toscrape.com/ --cache --css 'title=h3 a@title'   # fetches, stores
+pobear scrape https://books.toscrape.com/ --cache --css 'price=.price_color' # instant, from cache
+```
+
+Items served from the cache are marked `"cached": true`, and the summary adds `cached N`. Entries expire after `--cache-ttl` (default `24h`) and live in `~/.pobear/cache` (or `$POBEAR_CACHE_DIR`).
+
 ### Save a reusable scraping job
 
 Print a job spec instead of executing the command:

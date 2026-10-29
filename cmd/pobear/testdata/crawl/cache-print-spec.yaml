@@ -1,0 +1,24 @@
+args: crawl {{base}}/x --depth 0 --cache --cache-ttl 30m --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "crawl": {
+          "seeds": [
+            "{{base}}/x"
+          ],
+          "sitemap": true
+        }
+      },
+      "fetch": {
+        "use": "local",
+        "cache": {
+          "ttl": "30m"
+        }
+      },
+      "limits": {
+        "rps": 16
+      }
+    }
+stderr: ""
+exit: 0

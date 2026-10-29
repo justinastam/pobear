@@ -1,0 +1,13 @@
+args: scrape urls.txt --cache -c 1 --css title=h1
+stdout: |
+    {"url":"{{base}}/page.html","finalUrl":"{{base}}/page.html","parentUrl":"","status":200,"body":"<h1>Hello</h1>","depth":0,"data":{"title":["Hello"]},"tier":"local"}
+    {"url":"{{base}}/page.html","finalUrl":"{{base}}/page.html","parentUrl":"","status":200,"body":"<h1>Hello</h1>","depth":0,"data":{"title":["Hello"]},"tier":"local","cached":true}
+stderr: |
+    fetched 2, errors 0, skipped 0, cached 1
+exit: 0
+files:
+    urls.txt: |
+        {{base}}/page.html
+        {{base}}/page.html
+fixtures:
+    page.html: <h1>Hello</h1>

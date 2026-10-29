@@ -1,0 +1,16 @@
+args: scrape {{base}}/x --cache --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/x"
+        ]
+      },
+      "fetch": {
+        "use": "local",
+        "cache": {}
+      }
+    }
+stderr: ""
+exit: 0

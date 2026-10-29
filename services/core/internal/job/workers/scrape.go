@@ -68,6 +68,7 @@ func (s *Scrape) Run(ctx context.Context, spec *jobspec.Spec, url, parentURL str
 		Depth:     depth,
 		Data:      data,
 		Tier:      result.Tier,
+		Cached:    result.Cached,
 	}
 	if err := s.sinker.Write(ctx, item); err != nil {
 		return nil, "", "", err

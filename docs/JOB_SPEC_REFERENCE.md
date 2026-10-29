@@ -144,6 +144,8 @@ supported.
 | `noRedirects` | `bool` | all | `false` | `true` = a `3xx` is the final result; its `Location` is never followed, and in crawl mode never added to the frontier |
 | `headers` | `map[string]string` | all | `{}` | extra request headers, sent as-is |
 | `ladder` | `bool` | all | `false` | escalate to a higher configured tier (proxy, then provider) when a fetch is `blocked`, `rateLimit` or `timeout`; a no-op if no tier above `use` is configured |
+| `cache` | mapping: `{ttl}` | all | absent (off) | serve a repeat fetch from the on-disk response cache instead of the network — see below |
+| `cache.ttl` | duration string | all | `24h` | how long a stored response stays fresh; must be `> 0` |
 
 **Rule:** setting a field on a tier that doesn't support it is a validation error
 naming the field and the tier — never a silent no-op. This includes `options`: it
@@ -175,6 +177,33 @@ comes back as a successful fetch.
 
 `timeout` covers both the `fetch.timeout` deadline and a connection that times
 out at the socket level.
+
+**`cache` — reusing a response instead of refetching it:** present (even as
+`cache: {}`) turns the cache on; absent leaves it off. With it on, a fetch first
+looks for a stored response for the same URL under the same fetch settings, and
+returns it without touching the network — no `limits.concurrency` slot, no
+`limits.rps` wait, no retries. A miss fetches normally (including `ladder`) and
+stores the result, but only when it succeeded — a failure of any fault kind is
+never stored, so the next run fetches it again. An entry older than `ttl` is a
+miss and gets overwritten by the next successful fetch.
+
+- **Key:** the URL plus every `fetch` field that can change the response —
+  `use`, `ladder`, `name`, `template`, `proxy`, `profile`, `options`,
+  `noRedirects`, `headers`. `timeout` and `cache` itself are left out, since
+  neither changes what a successful fetch returns.
+- **Credentials never enter the key or the store:** a `proxy` URL's password is
+  dropped before keying (its username is kept, since proxy providers encode geo
+  or session targeting there), and the values of `Authorization`,
+  `Proxy-Authorization` and `Cookie` headers are blanked (whether they're set
+  still counts). Provider credentials are read at request time and are never
+  part of `fetch` at all. The consequence: changing only a credential reuses
+  the cached response.
+- **Location:** `$POBEAR_CACHE_DIR` if set, otherwise `~/.pobear/cache` — like
+  the providers directory, a property of the machine rather than of the job, so
+  it isn't a spec field. One JSON file per entry (status, final URL, serving
+  tier, body, time stored), written atomically. Nothing prunes it; deleting the
+  directory clears it.
+- **Marking:** an item served from the cache carries `cached: true` (§7).
 
 **`profile` only spoofs the TLS ClientHello, nothing else:** it doesn't touch
 `User-Agent` or any other header — a browser-shaped TLS fingerprint paired
@@ -272,7 +301,12 @@ lets it sit alongside other fields (`css`, `markdown`) in the same `data` map.
 Every fetched item also carries a top-level `tier` field (`local`, `proxy`, or
 `provider`) — which tier actually served that URL, regardless of `sink.use`. It's
 always present, even on a job that never sets `fetch.ladder`, in which case it's
-just `fetch.use` echoed back on every item.
+just `fetch.use` echoed back on every item. On a cached item it's the tier that
+originally fetched the stored response.
+
+An item served from the response cache (`fetch.cache`, §4) also carries
+`cached: true`; a freshly fetched item omits the field rather than writing
+`false`.
 
 - `stdout` streams NDJSON to stdout.
 - `ndjson` streams NDJSON to `path` as items complete.
@@ -308,7 +342,8 @@ a crawl:
 - `source.crawl`: negative `depth`/`maxPages`; `maxDuration` not a valid duration;
   `scope`/`robots` outside their enums; malformed `include`/`exclude` globs.
 - `fetch`: a field set for a tier that doesn't support it (§4); `profile`/`use`
-  outside their enums; `timeout` not a valid duration.
+  outside their enums; `timeout` not a valid duration; `cache` not a mapping,
+  or with a key other than `ttl`; `cache.ttl` not a valid duration, or `<= 0`.
 - `fetch.template`: set without `use: provider`; names a template `name`'s
   manifest doesn't declare; omitted when the manifest has 2+ templates and none
   is marked `default`.
@@ -327,7 +362,7 @@ a crawl:
 
 ## 9. Duration and glob syntax
 
-- **Durations** (`timeout`, `maxDuration`, `pluginTimeout`) use Go's
+- **Durations** (`timeout`, `cache.ttl`, `maxDuration`, `pluginTimeout`) use Go's
   `time.ParseDuration` syntax: an optional sign, then one or more decimal numbers
   each followed by a unit — `ms`, `s`, `m`, `h` — e.g. `"500ms"`, `"30s"`, `"10m"`,
   `"1h30m"`. An empty string means "no limit" wherever that's meaningful
@@ -382,6 +417,7 @@ fetch:
   timeout: 30s
   noRedirects: false
   headers: { "X-Custom": "1" }
+  cache: { ttl: 24h }
 
 limits:
   concurrency: 8

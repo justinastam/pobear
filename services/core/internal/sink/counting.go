@@ -63,3 +63,30 @@ func hasExtractedValue(data map[string]any) bool {
 	}
 	return false
 }
+
+type CachedCounter struct {
+	inner       ItemWriter
+	mu          sync.Mutex
+	cachedItems int
+}
+
+func NewCachedCounter(inner ItemWriter) *CachedCounter {
+	return &CachedCounter{inner: inner}
+}
+
+func (c *CachedCounter) Write(ctx context.Context, item sinks.Item) error {
+	if item.Cached {
+		c.mu.Lock()
+		c.cachedItems++
+		c.mu.Unlock()
+	}
+	return c.inner.Write(ctx, item)
+}
+
+func (c *CachedCounter) Close() error { return c.inner.Close() }
+
+func (c *CachedCounter) Cached() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.cachedItems
+}

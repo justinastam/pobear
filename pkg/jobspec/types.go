@@ -37,7 +37,14 @@ type Fetch struct {
 	NoRedirects bool              `yaml:"noRedirects,omitempty" json:"noRedirects,omitempty"`
 	Headers     map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
 	Ladder      bool              `yaml:"ladder,omitempty" json:"ladder,omitempty"`
+	Cache       *FetchCache       `yaml:"cache,omitempty" json:"cache,omitempty"`
 }
+
+type FetchCache struct {
+	TTL string `yaml:"ttl" json:"ttl"`
+}
+
+const DefaultCacheTTL = "24h"
 
 type Limits struct {
 	Concurrency       int    `yaml:"concurrency,omitempty" json:"concurrency,omitempty"`
