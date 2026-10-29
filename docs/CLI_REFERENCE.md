@@ -56,6 +56,8 @@ $ pobear scrape urls.txt --print-spec
 | `-e, --extract raw\|markdown` | — | add an extraction stage |
 | `--css name=selector[@attr]` | — | repeatable; each field name must be non-empty and set at most once |
 | `-H, --header "name: value"` | — | repeatable; sets `fetch.headers` (`JOB_SPEC_REFERENCE.md` §4) — each name must be non-empty and set at most once |
+| `--follow <selector[@attr]>` | — | follow a "next page" link chain from each URL — see below; `scrape` only |
+| `--max-pages <n>` | 100 | with `--follow`: pages fetched per chain, counting the starting URL; rejected without `--follow` |
 | `-o, --out <path>` | stdout | write NDJSON to a file, or one file per target plus an `index.json` if `<path>` is a directory — see below |
 | `-b, --bare` | off | print just the extracted value, no envelope — see below |
 | `--print-spec` | off | print the spec, don't run it — fields still at their default are omitted, see below |
@@ -81,6 +83,48 @@ reaching for a header flag already expects that letter.
 `crawl`'s own flags follow the same reasoning (below) — notably
 `--ignore-robots` is deliberately never abbreviated, since it disables a
 legal/courtesy default and shouldn't be easy to fat-finger.
+
+### `--follow` — every page of a listing, not the whole site
+
+`--follow` sets `source.follow` (`JOB_SPEC_REFERENCE.md` §3.3): each URL becomes
+the start of a pagination chain. Every page is fetched, extracted and emitted as
+its own record, then the first element matching the selector names the next page
+(`@attr` defaults to `href`, resolved against the page's final URL). The chain
+stops when a page has no next link, the next link was already fetched this run
+(the loop guard), or `--max-pages` pages have been fetched — in which case the
+link it didn't follow is counted as `skipped`:
+
+```
+$ pobear scrape https://books.toscrape.com/catalogue/page-1.html \
+    --follow 'li.next a' --max-pages 3 --css 'title=h3 a@title'
+{"url":"https://books.toscrape.com/catalogue/page-1.html","finalUrl":"…","parentUrl":"","status":200,"body":"…","depth":0,"data":{"title":["A Light in the Attic",…]},"tier":"local"}
+{"url":"https://books.toscrape.com/catalogue/page-2.html","finalUrl":"…","parentUrl":"https://books.toscrape.com/catalogue/page-1.html","status":200,"body":"…","depth":1,"data":{"title":["In Her Wake",…]},"tier":"local"}
+{"url":"https://books.toscrape.com/catalogue/page-3.html","finalUrl":"…","parentUrl":"https://books.toscrape.com/catalogue/page-2.html","status":200,"body":"…","depth":2,"data":{"title":["Slow States of Collapse: Poems",…]},"tier":"local"}
+fetched 3, errors 0, skipped 1
+```
+
+`parentUrl` is the previous page in the chain and `depth` its position (`0`
+for the starting URL). Pages within a chain are fetched in order, one at a time;
+with a file of starting URLs, separate chains run concurrently. `--max-pages`
+defaults to the spec default (`100`), so `--print-spec` omits it unless changed:
+
+```
+$ pobear scrape https://example.com/list --follow 'a[rel=next]' --print-spec
+{
+  "version": 1,
+  "source": { "urls": ["https://example.com/list"], "follow": { "selector": "a[rel=next]" } },
+  "fetch": { "use": "local" }
+}
+```
+
+`--max-pages` without `--follow` has nothing to cap, and is rejected:
+
+```
+$ pobear scrape https://example.com --max-pages 5
+pobear: --max-pages requires --follow
+$ echo $?
+3
+```
 
 ### `--ladder` — escalating to a higher tier when blocked
 
@@ -288,6 +332,16 @@ $ echo $?
 3
 ```
 
+`--follow` can fetch more than one page from a single URL, so it's rejected
+alongside `--bare` the same way (without `--out <dir>`):
+
+```
+$ pobear scrape https://example.com/list --follow 'a.next' --bare
+pobear: --bare can't be combined with --follow -- following next-page links can fetch more than one page, and --bare only ever prints a single value (use --out <dir> to write one file per page instead)
+$ echo $?
+3
+```
+
 `crawl` only ever takes one seed argument, but following links can still
 discover more than one page, so `--bare` there requires `--depth 0` (seeds
 only) — anything deeper is rejected before the crawl starts, not after it
@@ -322,7 +376,9 @@ Every target — succeeded, failed, or skipped — also gets an entry in
 (out of scope, excluded by `--include`/`--exclude`, disallowed by
 `robots.txt`, or the `--max-pages` budget was already spent); a link that's
 merely a duplicate of one already seen is silently dropped and never becomes
-an entry at all.
+an entry at all. `scrape --follow` works the same way: a chain stopped by
+`--max-pages` gets a skipped entry for the link it didn't follow, and a loop
+back to an already-fetched page gets none.
 
 ```json
 [
@@ -454,12 +510,12 @@ Takes exactly one starting URL — there's no CLI flag to add extra seeds. A cra
 with multiple seeds (`source.crawl.seeds` with 2+ entries) is only reachable by
 writing the job spec directly and running it with `pobear run`.
 
-Everything `scrape` has, plus:
+Everything `scrape` has except `--follow` (a crawl already follows links), plus:
 
 | Flag | Default | Notes |
 |---|---|---|
 | `-d, --depth <n>` | 1 | link-following depth; `0` = seeds only |
-| `--max-pages <n>` | 100 | |
+| `--max-pages <n>` | 100 | total pages fetched across the whole crawl (unlike `scrape --follow`'s per-chain cap) |
 | `--max-duration <duration>` | no limit | stop the whole crawl after this long, even if `max-pages` isn't reached |
 | `-s, --scope same-host\|same-domain\|any` | `same-host` | |
 | `-i, --include <glob>` | — | repeatable |

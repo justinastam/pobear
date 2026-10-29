@@ -299,3 +299,23 @@ func TestScrapeRunCopiesResultTierIntoTheSinkItem(t *testing.T) {
 		t.Fatalf("sink item Tier = %q, want %q", sinker.gotItem.Tier, "proxy")
 	}
 }
+
+func TestScrapeWithFollowReturnsOnlyTheNextLinkInsteadOfEveryLink(t *testing.T) {
+	body := []byte(`<a href="/other">Other</a><ul><li class="next"><a href="page-2.html">next</a></li></ul>`)
+	fetcher := &fakeFetcher{result: &tiers.Result{Status: 200, Body: body, FinalURL: "https://a.test/list/page-1.html"}}
+	links := &fakeLinkExtractor{links: []string{"https://a.test/other"}}
+
+	s := workers.NewScrape(fetcher, &fakeStager{}, &fakeSinker{}, links)
+	spec := &jobspec.Spec{Source: jobspec.Source{Follow: &jobspec.FollowSource{Selector: "li.next a@href", MaxPages: 10}}}
+	got, _, _, err := s.Run(context.Background(), spec, "https://a.test/list/page-1.html", "", 0, nil)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if len(got) != 1 || got[0] != "https://a.test/list/page-2.html" {
+		t.Fatalf("got %v, want [https://a.test/list/page-2.html]", got)
+	}
+	if links.calls != 0 {
+		t.Fatalf("expected the all-links extractor not to be consulted under source.follow, got %d calls", links.calls)
+	}
+}

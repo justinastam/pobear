@@ -202,3 +202,46 @@ func TestMinimalJSONCrawlWithDepth(t *testing.T) {
 		t.Fatalf("MinimalJSON =\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestMinimalJSONFollowOmitsDefaultMaxPages(t *testing.T) {
+	resolved, err := jobgen.Build(jobgen.Input{
+		URLs: []string{"https://example.com/list"}, FetchUse: "local",
+		Follow: &jobgen.FollowInput{Selector: "li.next a@href", MaxPages: new(100)},
+	})
+	if err != nil {
+		t.Fatalf("Build(resolved): %v", err)
+	}
+	if resolved.Source.Follow == nil || resolved.Source.Follow.Selector != "li.next a@href" || resolved.Source.Follow.MaxPages != 100 {
+		t.Fatalf("Source.Follow = %+v, want {li.next a@href 100}", resolved.Source.Follow)
+	}
+	defaults, err := jobgen.Build(jobgen.Input{
+		URLs: []string{"https://example.com/list"}, FetchUse: "local",
+		Follow: &jobgen.FollowInput{Selector: "li.next a@href"},
+	})
+	if err != nil {
+		t.Fatalf("Build(defaults): %v", err)
+	}
+
+	got, err := jobgen.MinimalJSON(resolved, defaults)
+	if err != nil {
+		t.Fatalf("MinimalJSON: %v", err)
+	}
+
+	want := `{
+  "version": 1,
+  "source": {
+    "urls": [
+      "https://example.com/list"
+    ],
+    "follow": {
+      "selector": "li.next a@href"
+    }
+  },
+  "fetch": {
+    "use": "local"
+  }
+}`
+	if string(got) != want {
+		t.Fatalf("MinimalJSON =\n%s\nwant\n%s", got, want)
+	}
+}

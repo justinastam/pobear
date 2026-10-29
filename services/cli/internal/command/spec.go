@@ -129,6 +129,13 @@ func validateBareCrawlDepth(bare, dirOut bool, depth int) *cliError {
 	return newCLIError(exitcode.UsageError, "--bare requires --depth 0 -- crawling deeper can discover more than one page, and --bare only ever prints a single value (use --out <dir> to write one file per page instead)")
 }
 
+func validateBareFollow(bare, dirOut bool, follow *jobgen.FollowInput) *cliError {
+	if !bare || dirOut || follow == nil {
+		return nil
+	}
+	return newCLIError(exitcode.UsageError, "--bare can't be combined with --follow -- following next-page links can fetch more than one page, and --bare only ever prints a single value (use --out <dir> to write one file per page instead)")
+}
+
 func resolveScrapeURLs(arg string) ([]string, *cliError) {
 	if utils.IsAbsoluteHTTPURL(arg) {
 		return []string{arg}, nil

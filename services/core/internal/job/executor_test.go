@@ -18,24 +18,32 @@ import (
 )
 
 type fakeScrapeWorker struct {
-	mu      sync.Mutex
-	results map[string]fakeScrapeResult
-	calls   int
-	gotURLs []string
+	mu       sync.Mutex
+	results  map[string]fakeScrapeResult
+	calls    int
+	gotURLs  []string
+	gotCalls []scrapeCall
 }
 
 type fakeScrapeResult struct {
-	kind fault.Kind
-	err  error
+	links []string
+	kind  fault.Kind
+	err   error
 }
 
-func (f *fakeScrapeWorker) Run(_ context.Context, _ *jobspec.Spec, url, _ string, _ int, _ workers.EmitGate) ([]string, string, fault.Kind, error) {
+type scrapeCall struct {
+	url, parentURL string
+	depth          int
+}
+
+func (f *fakeScrapeWorker) Run(_ context.Context, _ *jobspec.Spec, url, parentURL string, depth int, _ workers.EmitGate) ([]string, string, fault.Kind, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.gotURLs = append(f.gotURLs, url)
+	f.gotCalls = append(f.gotCalls, scrapeCall{url: url, parentURL: parentURL, depth: depth})
 	f.calls++
 	r := f.results[url]
-	return nil, "", r.kind, r.err
+	return r.links, "", r.kind, r.err
 }
 
 type fakeCrawlWorker struct {
@@ -273,5 +281,121 @@ func TestExecutorClosesSinkEvenWhenItemsFail(t *testing.T) {
 	}
 	if sink.calls != 1 {
 		t.Fatalf("expected Close still called exactly once even though the only item failed, got %d", sink.calls)
+	}
+}
+
+func followSpec(maxPages int, urls ...string) *jobspec.Spec {
+	return &jobspec.Spec{Source: jobspec.Source{URLs: urls, Follow: &jobspec.FollowSource{Selector: "a.next", MaxPages: maxPages}}}
+}
+
+func TestExecutorFollowWalksTheNextLinkChainUntilNoNextLink(t *testing.T) {
+	scrape := &fakeScrapeWorker{results: map[string]fakeScrapeResult{
+		"https://a.test/1": {links: []string{"https://a.test/2"}},
+		"https://a.test/2": {links: []string{"https://a.test/3"}},
+		"https://a.test/3": {},
+	}}
+	e := job.NewExecutor(scrape, &fakeCrawlWorker{}, &fakeSinkCloser{})
+
+	got, err := e.Run(context.Background(), followSpec(100, "https://a.test/1"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Succeeded != 3 || got.Failed != 0 || got.Skipped != 0 {
+		t.Fatalf("got %+v, want Succeeded=3 Failed=0 Skipped=0", got)
+	}
+	want := []scrapeCall{
+		{url: "https://a.test/1", parentURL: "", depth: 0},
+		{url: "https://a.test/2", parentURL: "https://a.test/1", depth: 1},
+		{url: "https://a.test/3", parentURL: "https://a.test/2", depth: 2},
+	}
+	if !slices.Equal(scrape.gotCalls, want) {
+		t.Fatalf("calls = %+v, want %+v (in chain order, each page's parent the one before it)", scrape.gotCalls, want)
+	}
+}
+
+func TestExecutorFollowStopsOnAnAlreadySeenURL(t *testing.T) {
+	scrape := &fakeScrapeWorker{results: map[string]fakeScrapeResult{
+		"https://a.test/1": {links: []string{"https://a.test/2"}},
+		"https://a.test/2": {links: []string{"https://a.test/1#top"}},
+	}}
+	e := job.NewExecutor(scrape, &fakeCrawlWorker{}, &fakeSinkCloser{})
+
+	got, err := e.Run(context.Background(), followSpec(100, "https://a.test/1"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Succeeded != 2 || got.Skipped != 0 || scrape.calls != 2 {
+		t.Fatalf("got %+v after %d calls, want Succeeded=2 Skipped=0 after 2 calls (a loop back to a seen page ends the chain silently)", got, scrape.calls)
+	}
+}
+
+func TestExecutorFollowStopsAtMaxPagesAndReportsTheNextLinkSkipped(t *testing.T) {
+	scrape := &fakeScrapeWorker{results: map[string]fakeScrapeResult{
+		"https://a.test/1": {links: []string{"https://a.test/2"}},
+		"https://a.test/2": {links: []string{"https://a.test/3"}},
+		"https://a.test/3": {},
+	}}
+	e := job.NewExecutor(scrape, &fakeCrawlWorker{}, &fakeSinkCloser{})
+
+	got, err := e.Run(context.Background(), followSpec(2, "https://a.test/1"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Succeeded != 2 || got.Skipped != 1 || scrape.calls != 2 {
+		t.Fatalf("got %+v after %d calls, want Succeeded=2 Skipped=1 after 2 calls", got, scrape.calls)
+	}
+	if len(got.SkippedURLs) != 1 || !strings.Contains(got.SkippedURLs[0], "https://a.test/3") || !strings.Contains(got.SkippedURLs[0], "over --max-pages budget") {
+		t.Fatalf("SkippedURLs = %v, want one entry naming https://a.test/3 and the budget", got.SkippedURLs)
+	}
+}
+
+func TestExecutorFollowStopsTheChainOnAFailedPage(t *testing.T) {
+	scrape := &fakeScrapeWorker{results: map[string]fakeScrapeResult{
+		"https://a.test/1": {links: []string{"https://a.test/2"}},
+		"https://a.test/2": {links: []string{"https://a.test/3"}, kind: fault.Network, err: errors.New("connection refused")},
+	}}
+	e := job.NewExecutor(scrape, &fakeCrawlWorker{}, &fakeSinkCloser{})
+
+	got, err := e.Run(context.Background(), followSpec(100, "https://a.test/1"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Succeeded != 1 || got.Failed != 1 || scrape.calls != 2 {
+		t.Fatalf("got %+v after %d calls, want Succeeded=1 Failed=1 after 2 calls", got, scrape.calls)
+	}
+	if len(got.Errors) != 1 || !strings.Contains(got.Errors[0], "https://a.test/2") {
+		t.Fatalf("Errors = %v, want one entry naming https://a.test/2", got.Errors)
+	}
+}
+
+func TestExecutorFollowNeverFetchesAPageTwiceAcrossChains(t *testing.T) {
+	scrape := &fakeScrapeWorker{results: map[string]fakeScrapeResult{
+		"https://a.test/1": {links: []string{"https://a.test/2"}},
+		"https://a.test/2": {links: []string{"https://a.test/3"}},
+		"https://a.test/3": {},
+	}}
+	e := job.NewExecutor(scrape, &fakeCrawlWorker{}, &fakeSinkCloser{})
+
+	got, err := e.Run(context.Background(), followSpec(100, "https://a.test/1", "https://a.test/2", "https://a.test/1"))
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Succeeded != 3 || scrape.calls != 3 {
+		t.Fatalf("got %+v after %d calls (%v), want each of the 3 pages fetched exactly once", got, scrape.calls, scrape.gotURLs)
+	}
+}
+
+func TestExecutorURLListWithoutFollowIgnoresReturnedLinks(t *testing.T) {
+	scrape := &fakeScrapeWorker{results: map[string]fakeScrapeResult{
+		"https://a.test/1": {links: []string{"https://a.test/2"}},
+	}}
+	e := job.NewExecutor(scrape, &fakeCrawlWorker{}, &fakeSinkCloser{})
+
+	spec := &jobspec.Spec{Source: jobspec.Source{URLs: []string{"https://a.test/1"}}}
+	if _, err := e.Run(context.Background(), spec); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if scrape.calls != 1 {
+		t.Fatalf("expected exactly 1 call without source.follow, got %d (%v)", scrape.calls, scrape.gotURLs)
 	}
 }

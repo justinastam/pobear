@@ -73,5 +73,11 @@ func (s *Scrape) Run(ctx context.Context, spec *jobspec.Spec, url, parentURL str
 		return nil, "", "", err
 	}
 
+	if follow := spec.Source.Follow; follow != nil {
+		if next, ok := FollowLink(result.Body, result.FinalURL, follow.Selector); ok {
+			return []string{next}, "", "", nil
+		}
+		return nil, "", "", nil
+	}
 	return s.links.Extract(result.Body, result.FinalURL), "", "", nil
 }

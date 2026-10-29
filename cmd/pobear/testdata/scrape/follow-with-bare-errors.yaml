@@ -1,0 +1,5 @@
+args: scrape {{base}}/x --follow a.next --bare
+stdout: ""
+stderr: |
+    pobear: --bare can't be combined with --follow -- following next-page links can fetch more than one page, and --bare only ever prints a single value (use --out <dir> to write one file per page instead)
+exit: 3

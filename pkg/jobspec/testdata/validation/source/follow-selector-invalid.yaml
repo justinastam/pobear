@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test], follow: {selector: "li.next >> a@href"}}
+  fetch: {use: local}
+wantErr: true
+wantField: source.follow.selector
+wantMessage: "`source.follow.selector` is not a valid CSS selector: \"li.next >> a\""
