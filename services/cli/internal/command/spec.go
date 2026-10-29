@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -127,6 +128,18 @@ func validateBareCrawlDepth(bare, dirOut bool, depth int) *cliError {
 		return nil
 	}
 	return newCLIError(exitcode.UsageError, "--bare requires --depth 0 -- crawling deeper can discover more than one page, and --bare only ever prints a single value (use --out <dir> to write one file per page instead)")
+}
+
+func resolveResume(f *commonFlags) (appendOut bool, cerr *cliError) {
+	fileOut := f.out != "" && !isDirOut(f.out)
+	if f.appendOut && !fileOut {
+		return false, newCLIError(exitcode.UsageError, "--append requires --out <file>")
+	}
+	if f.skipSeen != "" && f.bare && !isDirOut(f.out) {
+		return false, newCLIError(exitcode.UsageError, "--skip-seen can't be combined with --bare unless --out is a directory -- a single bare value has nothing to resume")
+	}
+	sameFile := f.skipSeen != "" && fileOut && filepath.Clean(f.skipSeen) == filepath.Clean(f.out)
+	return f.appendOut || sameFile, nil
 }
 
 func resolveScrapeURLs(arg string) ([]string, *cliError) {
@@ -264,6 +277,9 @@ func execAndSummarize(ctx context.Context, runner JobRunner, data []byte, stderr
 	summary := fmt.Sprintf("fetched %d, errors %d, skipped %d", result.Succeeded, result.Failed, result.Skipped)
 	if result.Empty > 0 {
 		summary += fmt.Sprintf(", empty %d", result.Empty)
+	}
+	if result.Seen > 0 {
+		summary += fmt.Sprintf(", seen %d", result.Seen)
 	}
 	fmt.Fprintln(stderr, summary)
 	return exitcode.FromRun(result.Succeeded, result.Failed, result.Kinds), result, nil

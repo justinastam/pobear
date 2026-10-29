@@ -2,6 +2,8 @@ package workers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 
 	"github.com/Decodo/pobear/pkg/fault"
@@ -68,10 +70,19 @@ func (s *Scrape) Run(ctx context.Context, spec *jobspec.Spec, url, parentURL str
 		Depth:     depth,
 		Data:      data,
 		Tier:      result.Tier,
+		Hash:      BodyHash(result.Body),
 	}
 	if err := s.sinker.Write(ctx, item); err != nil {
 		return nil, "", "", err
 	}
 
 	return s.links.Extract(result.Body, result.FinalURL), "", "", nil
+}
+
+// BodyHash is the envelope's `hash` field: a SHA-256 of the body exactly as
+// the envelope's `body` carries it, so two runs' items can be diffed by hash
+// without comparing bodies.
+func BodyHash(body []byte) string {
+	sum := sha256.Sum256(body)
+	return "sha256:" + hex.EncodeToString(sum[:])
 }

@@ -23,6 +23,7 @@ type CrawlInput struct {
 type Input struct {
 	URLs        []string
 	Crawl       *CrawlInput
+	SkipSeen    string
 	FetchUse    string
 	Ladder      bool
 	Proxy       string
@@ -39,6 +40,7 @@ type Input struct {
 	Retries     *int
 	SinkUse     string
 	SinkPath    string
+	SinkAppend  bool
 }
 
 func Build(in Input) (*jobspec.Spec, error) {
@@ -65,6 +67,14 @@ func Build(in Input) (*jobspec.Spec, error) {
 }
 
 func buildSourceDoc(in Input) map[string]any {
+	source := buildSourceListDoc(in)
+	if in.SkipSeen != "" {
+		source["skipSeen"] = in.SkipSeen
+	}
+	return source
+}
+
+func buildSourceListDoc(in Input) map[string]any {
 	if in.Crawl == nil {
 		return map[string]any{"urls": in.URLs}
 	}
@@ -167,6 +177,9 @@ func buildSinkDoc(in Input) map[string]any {
 	if in.SinkPath != "" {
 		sink["path"] = in.SinkPath
 	}
+	if in.SinkAppend {
+		sink["append"] = in.SinkAppend
+	}
 	return sink
 }
 
@@ -180,8 +193,9 @@ type minimalSpec struct {
 }
 
 type minimalSource struct {
-	URLs  []string            `json:"urls,omitempty"`
-	Crawl *minimalCrawlSource `json:"crawl,omitempty"`
+	URLs     []string            `json:"urls,omitempty"`
+	Crawl    *minimalCrawlSource `json:"crawl,omitempty"`
+	SkipSeen string              `json:"skipSeen,omitempty"`
 }
 
 type minimalCrawlSource struct {
@@ -219,8 +233,9 @@ type minimalLimits struct {
 }
 
 type minimalSink struct {
-	Use  *string `json:"use,omitempty"`
-	Path *string `json:"path,omitempty"`
+	Use    *string `json:"use,omitempty"`
+	Path   *string `json:"path,omitempty"`
+	Append *bool   `json:"append,omitempty"`
 }
 
 func MinimalJSON(resolved, defaults *jobspec.Spec) ([]byte, error) {
@@ -239,9 +254,9 @@ func MinimalJSON(resolved, defaults *jobspec.Spec) ([]byte, error) {
 
 func minimalSourceFrom(r, d jobspec.Source) minimalSource {
 	if r.Crawl != nil {
-		return minimalSource{Crawl: minimalCrawlFrom(r.Crawl, d.Crawl)}
+		return minimalSource{Crawl: minimalCrawlFrom(r.Crawl, d.Crawl), SkipSeen: r.SkipSeen}
 	}
-	return minimalSource{URLs: r.URLs}
+	return minimalSource{URLs: r.URLs, SkipSeen: r.SkipSeen}
 }
 
 func minimalCrawlFrom(r, d *jobspec.CrawlSource) *minimalCrawlSource {
@@ -297,8 +312,9 @@ func minimalLimitsFrom(r, d jobspec.Limits) *minimalLimits {
 
 func minimalSinkFrom(r, d jobspec.Sink) *minimalSink {
 	sink := minimalSink{
-		Use:  diffString(r.Use, d.Use),
-		Path: diffString(r.Path, d.Path),
+		Use:    diffString(r.Use, d.Use),
+		Path:   diffString(r.Path, d.Path),
+		Append: diffBool(r.Append, d.Append),
 	}
 	if sink == (minimalSink{}) {
 		return nil

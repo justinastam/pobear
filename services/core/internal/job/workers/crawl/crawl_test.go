@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -804,5 +807,74 @@ func TestCrawlSeedItselfIsExemptFromRobots(t *testing.T) {
 	}
 	if got.Succeeded != 1 {
 		t.Fatalf("got Succeeded=%d, want 1 (an explicit seed stays exempt)", got.Succeeded)
+	}
+}
+
+func writeSeen(t *testing.T, lines ...string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "seen.ndjson")
+	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600); err != nil {
+		t.Fatalf("writing %s: %v", path, err)
+	}
+	return path
+}
+
+func TestCrawlSkipSeenTraversesASeenPageWithoutFetchingIt(t *testing.T) {
+	scrape := &fakeScrapeWorker{children: map[string][]string{
+		"https://a.test/new": {"https://a.test/deeper"},
+	}}
+	c := crawl.NewCrawl(scrape, nil, nil)
+	seenPath := writeSeen(t,
+		`{"url":"https://a.test","finalUrl":"https://a.test/","body":"<a href=\"/old\">o</a><a href=\"/new\">n</a>"}`,
+		`{"url":"https://a.test/old","finalUrl":"https://a.test/old","body":""}`,
+	)
+
+	spec := &jobspec.Spec{Source: jobspec.Source{SkipSeen: seenPath, Crawl: &jobspec.CrawlSource{
+		Seeds: []string{"https://a.test"}, Depth: 2, MaxPages: 100, Scope: "same-host", Robots: "ignore",
+	}}}
+	got, err := c.Run(context.Background(), spec)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Seen != 2 || got.Succeeded != 2 {
+		t.Fatalf("got Seen=%d Succeeded=%d, want Seen=2 (seed + /old) Succeeded=2 (/new + /deeper)", got.Seen, got.Succeeded)
+	}
+	slices.Sort(scrape.visited)
+	if want := []string{"https://a.test/deeper", "https://a.test/new"}; !slices.Equal(scrape.visited, want) {
+		t.Fatalf("fetched %v, want only the unseen pages %v", scrape.visited, want)
+	}
+}
+
+func TestCrawlSkipSeenPagesCountTowardMaxPages(t *testing.T) {
+	scrape := &fakeScrapeWorker{}
+	c := crawl.NewCrawl(scrape, nil, nil)
+	seenPath := writeSeen(t,
+		`{"url":"https://a.test","body":"<a href=\"/1\">1</a>"}`,
+		`{"url":"https://a.test/1","body":"<a href=\"/2\">2</a><a href=\"/3\">3</a>"}`,
+	)
+
+	spec := &jobspec.Spec{Source: jobspec.Source{SkipSeen: seenPath, Crawl: &jobspec.CrawlSource{
+		Seeds: []string{"https://a.test"}, Depth: 2, MaxPages: 3, Scope: "same-host", Robots: "ignore",
+	}}}
+	got, err := c.Run(context.Background(), spec)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Seen != 2 || got.Succeeded != 1 || got.Skipped != 1 {
+		t.Fatalf("got Seen=%d Succeeded=%d Skipped=%d, want 2/1/1 (a resumed crawl stops at the same total as an uninterrupted one)", got.Seen, got.Succeeded, got.Skipped)
+	}
+}
+
+func TestCrawlSkipSeenRejectsAFileThatIsNotNDJSON(t *testing.T) {
+	c := crawl.NewCrawl(&fakeScrapeWorker{}, nil, nil)
+	seenPath := writeSeen(t, "[", `{"url":"https://a.test"}`, "]")
+
+	spec := &jobspec.Spec{Source: jobspec.Source{SkipSeen: seenPath, Crawl: &jobspec.CrawlSource{
+		Seeds: []string{"https://a.test"}, Depth: 1, MaxPages: 100, Scope: "same-host", Robots: "ignore",
+	}}}
+	if _, err := c.Run(context.Background(), spec); err == nil {
+		t.Fatal("expected an error for a skipSeen file that isn't NDJSON envelopes")
 	}
 }

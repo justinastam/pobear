@@ -3,6 +3,8 @@ package job_test
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -80,6 +82,30 @@ func TestExecutorURLListDispatchesEachURLAndTalliesSuccesses(t *testing.T) {
 	slices.Sort(wantURLs)
 	if !slices.Equal(gotURLs, wantURLs) {
 		t.Fatalf("dispatched URLs (any order) = %v, want %v", scrape.gotURLs, want)
+	}
+}
+
+func TestExecutorURLListSkipsURLsAlreadyInSkipSeen(t *testing.T) {
+	seenPath := filepath.Join(t.TempDir(), "prev.ndjson")
+	if err := os.WriteFile(seenPath, []byte(`{"url":"https://a.test#frag"}`+"\n"+`{"url":"https://c.test","bo`), 0o600); err != nil {
+		t.Fatalf("writing %s: %v", seenPath, err)
+	}
+	scrape := &fakeScrapeWorker{}
+	e := job.NewExecutor(scrape, &fakeCrawlWorker{}, &fakeSinkCloser{})
+
+	spec := &jobspec.Spec{Source: jobspec.Source{URLs: []string{"https://a.test", "https://b.test", "https://c.test"}, SkipSeen: seenPath}}
+	got, err := e.Run(context.Background(), spec)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if got.Seen != 1 || got.Succeeded != 2 || got.Skipped != 0 {
+		t.Fatalf("got %+v, want Seen=1 Succeeded=2 Skipped=0 (c.test's record was truncated, so it's re-fetched)", got)
+	}
+	gotURLs := slices.Clone(scrape.gotURLs)
+	slices.Sort(gotURLs)
+	if want := []string{"https://b.test", "https://c.test"}; !slices.Equal(gotURLs, want) {
+		t.Fatalf("dispatched %v, want %v", gotURLs, want)
 	}
 }
 

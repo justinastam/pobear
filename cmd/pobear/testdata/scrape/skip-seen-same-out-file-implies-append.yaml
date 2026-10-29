@@ -1,0 +1,21 @@
+args: scrape {{base}}/page.html --skip-seen out.ndjson --out out.ndjson --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/page.html"
+        ],
+        "skipSeen": "out.ndjson"
+      },
+      "fetch": {
+        "use": "local"
+      },
+      "sink": {
+        "use": "ndjson",
+        "path": "out.ndjson",
+        "append": true
+      }
+    }
+stderr: ""
+exit: 0

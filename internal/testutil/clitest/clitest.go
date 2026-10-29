@@ -61,7 +61,7 @@ func Run(t *testing.T, binPath, path string) {
 
 	runDir := t.TempDir()
 	for name, content := range c.Files {
-		writeNamed(t, runDir, name, content)
+		writeNamed(t, runDir, name, substitute(content, srv.URL, homeDir))
 	}
 	if len(c.Providers) > 0 {
 		providersDir := filepath.Join(homeDir, ".pobear", "providers")

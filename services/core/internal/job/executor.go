@@ -8,6 +8,7 @@ import (
 	"github.com/Decodo/pobear/pkg/jobresult"
 	"github.com/Decodo/pobear/pkg/jobspec"
 	"github.com/Decodo/pobear/services/core/internal/job/pool"
+	"github.com/Decodo/pobear/services/core/internal/job/seen"
 	"github.com/Decodo/pobear/services/core/internal/job/workers"
 )
 
@@ -47,10 +48,19 @@ func (e *Executor) Run(ctx context.Context, spec *jobspec.Spec) (result Result, 
 		return
 	}
 
+	seenSet, err := seen.Load(spec.Source.SkipSeen, nil)
+	if err != nil {
+		return result, err
+	}
+
 	p := pool.New(spec.Limits.Concurrency)
 	var mu sync.Mutex
 
 	for _, url := range spec.Source.URLs {
+		if seenSet.Has(url) {
+			result.Seen++
+			continue
+		}
 		p.Submit(func() {
 			_, _, kind, scrapeErr := e.scrape.Run(ctx, spec, url, "", 0, nil)
 

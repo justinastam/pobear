@@ -10,8 +10,9 @@ type Spec struct {
 }
 
 type Source struct {
-	URLs  []string     `yaml:"urls,omitempty" json:"urls,omitempty"`
-	Crawl *CrawlSource `yaml:"crawl,omitempty" json:"crawl,omitempty"`
+	URLs     []string     `yaml:"urls,omitempty" json:"urls,omitempty"`
+	Crawl    *CrawlSource `yaml:"crawl,omitempty" json:"crawl,omitempty"`
+	SkipSeen string       `yaml:"skipSeen,omitempty" json:"skipSeen,omitempty"`
 }
 
 type CrawlSource struct {
@@ -55,8 +56,9 @@ type Stage struct {
 }
 
 type Sink struct {
-	Use  string `yaml:"use" json:"use"`
-	Path string `yaml:"path,omitempty" json:"path,omitempty"`
+	Use    string `yaml:"use" json:"use"`
+	Path   string `yaml:"path,omitempty" json:"path,omitempty"`
+	Append bool   `yaml:"append,omitempty" json:"append,omitempty"`
 }
 
 var FetchTierOrder = []string{"local", "proxy", "provider"}

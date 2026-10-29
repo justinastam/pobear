@@ -30,10 +30,12 @@
       /job
         parser.go                 // job-parser: load-time validation of a spec (§8) before anything runs
         executor.go                // job-executor: run loop — for a plain URL list, submits each URL to a pool.Pool sized by limits.concurrency and collects results under a mutex; a crawl source delegates wholesale to the crawl worker instead
+        /seen
+          seen.go                   // loads source.skipSeen: reads an earlier run's NDJSON output (tolerating a killed run's half-written last line) into the set of already-emitted URLs, keyed by the same canonical form (Key) crawl's dedupe.go claims by; for a crawl, also extracts each seen page's links from its stored body so the frontier can traverse past it without re-fetching. job.Executor drops seen URLs from a URL list; crawl.Crawl replays them
         /pool
           pool.go                   // pool.Pool: runs units of work with bounded concurrency, where a unit may itself Submit more work while running (the recursive-WaitGroup pattern) — what crawl.Crawl's frontier needs (dynamic, growing work) and job.Executor's fixed URL list uses as the degenerate case (nothing ever self-submits)
         /workers                   // the different things job-executor can dispatch a unit of work to
-          scrape.go                 // scrape (Core worker): base per-URL pipeline — fetch -> stage -> sink one item
+          scrape.go                 // scrape (Core worker): base per-URL pipeline — fetch -> stage -> sink one item; stamps each item's `hash` (sha256 of its body)
           links.go                  // the real workers.LinkExtractor: walks a fetched HTML body's <a href> elements via goquery (already a dependency), resolving each relative href against the page's own FinalURL; non-http(s)/malformed hrefs are silently dropped, never counted anywhere
           /crawl
             crawl.go                 // crawl (Core worker): scrape + frontier logic (depth/maxPages/maxDuration/scope/include/exclude/sitemap/robots), dispatched through the same job/pool.Pool as job.Executor's URL list -- each unit submits one more unit per surviving discovered link. limits.maxPages is an approximate cap under concurrency (can briefly overshoot by up to limits.concurrency-1, since several units can pass the budget check before any of them updates the shared count) -- an exact cap would mean serializing that check, defeating the concurrency
@@ -59,7 +61,7 @@
         sinker.go                  // sinker: reads sink.use and dispatches a finished item to whichever sink implementation is selected
         /sinks                      // the different sink implementations sinker can dispatch to — this is the "sink" interface from the diagram
           stdout.go                   // stdout sink (default): streams NDJSON to stdout
-          ndjson.go                   // ndjson sink: streams NDJSON to sink.path as items complete
+          ndjson.go                   // ndjson sink: streams NDJSON to sink.path as items complete; with sink.append, appends to an existing file instead, first trimming a half-written last line
           json.go                     // json sink: buffers every item, writes one JSON array to sink.path on completion
           stream.go                   // stream sink: used when a job is running over RPC — pushes items to the RPC streamer instead of a local file/stdout
 

@@ -1,0 +1,8 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test], skipSeen: out.json}
+  fetch: {use: local}
+  sink: {use: json, path: out.json}
+wantErr: true
+wantField: sink.append
+wantMessage: "`sink.path` is the same file as `source.skipSeen`, which requires `sink.use: ndjson` with `sink.append: true` -- otherwise this run would overwrite the results it is resuming from"

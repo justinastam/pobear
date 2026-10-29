@@ -1,0 +1,11 @@
+args: run job.yaml
+stdout: ""
+stderr: |
+    pobear: spec: `sink.path` is the same file as `source.skipSeen`, which requires `sink.use: ndjson` with `sink.append: true` -- otherwise this run would overwrite the results it is resuming from
+exit: 3
+files:
+    job.yaml: |
+        version: 1
+        source: {urls: ["{{base}}/page.html"], skipSeen: out.ndjson}
+        fetch: {use: local}
+        sink: {use: ndjson, path: out.ndjson}

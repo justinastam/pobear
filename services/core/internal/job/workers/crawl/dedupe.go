@@ -1,9 +1,9 @@
 package crawl
 
 import (
-	"net/url"
-	"sort"
 	"sync"
+
+	"github.com/Decodo/pobear/services/core/internal/job/seen"
 )
 
 type dedupe struct {
@@ -16,7 +16,7 @@ func newDedupe() *dedupe {
 }
 
 func (d *dedupe) claim(rawURL string) bool {
-	key := dedupeKey(rawURL)
+	key := seen.Key(rawURL)
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -25,22 +25,4 @@ func (d *dedupe) claim(rawURL string) bool {
 	}
 	d.seen[key] = struct{}{}
 	return true
-}
-
-func dedupeKey(rawURL string) string {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return rawURL
-	}
-	u.Fragment = ""
-	u.RawFragment = ""
-	u.RawQuery = canonicalQuery(u.Query())
-	return u.String()
-}
-
-func canonicalQuery(q url.Values) string {
-	for _, values := range q {
-		sort.Strings(values)
-	}
-	return q.Encode()
 }

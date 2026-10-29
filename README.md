@@ -78,6 +78,17 @@ pobear scrape urls.txt --extract markdown --out pages.ndjson
 
 This is useful when another step in your workflow already produces the URLs. Blank lines and lines beginning with `#` are ignored.
 
+### Resume an interrupted crawl
+
+If a long crawl is stopped partway through, rerun the same command with `--skip-seen` pointing at its output. Pages already in the file aren't fetched again, but their links are still followed, and new results are appended to the same file:
+
+```sh
+pobear crawl https://books.toscrape.com/ --depth 3 --max-pages 2000 \
+  --skip-seen books.ndjson --out books.ndjson
+```
+
+Write to a different file to collect only the pages that are new since an earlier run. Every record also has a `hash` of its body, so comparing two runs by `url` and `hash` shows which pages changed. See [`--skip-seen`](docs/CLI_REFERENCE.md#--skip-seen-file--resuming-an-interrupted-run-or-emitting-only-new-urls) for details.
+
 ### Save a reusable scraping job
 
 Print a job spec instead of executing the command:

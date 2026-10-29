@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test], skipSeen: [a.ndjson]}
+  fetch: {use: local}
+wantErr: true
+wantField: source.skipSeen
+wantMessage: "`source.skipSeen` must be a file path, got [a.ndjson]"
