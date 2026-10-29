@@ -17,6 +17,7 @@ stdout: |
       "limits": {
         "concurrency": 8,
         "rps": 0,
+        "rpsPerHost": 0,
         "retries": 3,
         "backoff": "exponential",
         "pluginConcurrency": 0,

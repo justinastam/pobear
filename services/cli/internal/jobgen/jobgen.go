@@ -36,6 +36,7 @@ type Input struct {
 	Stages      []jobspec.Stage
 	Concurrency *int
 	RPS         *int
+	RPSPerHost  *int
 	Retries     *int
 	SinkUse     string
 	SinkPath    string
@@ -135,6 +136,9 @@ func buildLimitsDoc(in Input) map[string]any {
 	if in.RPS != nil {
 		limits["rps"] = *in.RPS
 	}
+	if in.RPSPerHost != nil {
+		limits["rpsPerHost"] = *in.RPSPerHost
+	}
 	if in.Retries != nil {
 		limits["retries"] = *in.Retries
 	}
@@ -212,6 +216,7 @@ type minimalFetch struct {
 type minimalLimits struct {
 	Concurrency       *int    `json:"concurrency,omitempty"`
 	RPS               *int    `json:"rps,omitempty"`
+	RPSPerHost        *int    `json:"rpsPerHost,omitempty"`
 	Retries           *int    `json:"retries,omitempty"`
 	Backoff           *string `json:"backoff,omitempty"`
 	PluginConcurrency *int    `json:"pluginConcurrency,omitempty"`
@@ -284,6 +289,7 @@ func minimalLimitsFrom(r, d jobspec.Limits) *minimalLimits {
 	lim := minimalLimits{
 		Concurrency:       diffInt(r.Concurrency, d.Concurrency),
 		RPS:               diffInt(r.RPS, d.RPS),
+		RPSPerHost:        diffInt(r.RPSPerHost, d.RPSPerHost),
 		Retries:           diffInt(r.Retries, d.Retries),
 		Backoff:           diffString(r.Backoff, d.Backoff),
 		PluginConcurrency: diffInt(r.PluginConcurrency, d.PluginConcurrency),

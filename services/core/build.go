@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/Decodo/pobear/pkg/credentials"
 	"github.com/Decodo/pobear/pkg/jobspec"
@@ -44,7 +45,8 @@ func (e *liveExecutor) Run(ctx context.Context, spec *jobspec.Spec) (job.Result,
 		return job.Result{}, err
 	}
 
-	fetcher, err := e.createFetcher(manifests, spec)
+	robotsChecker := crawl.NewHTTPRobotsChecker(http.DefaultClient)
+	fetcher, err := e.createFetcher(manifests, spec, crawlDelayFor(spec, robotsChecker))
 	if err != nil {
 		return job.Result{}, err
 	}
@@ -52,7 +54,6 @@ func (e *liveExecutor) Run(ctx context.Context, spec *jobspec.Spec) (job.Result,
 	sinker := sink.NewEmptyCounter(e.createSinker(spec), len(spec.Stages) > 0)
 
 	scrapeWorker := workers.NewScrape(fetcher, stager, sinker, workers.HTMLLinks{})
-	robotsChecker := crawl.NewHTTPRobotsChecker(http.DefaultClient)
 	sitemapFetcher := crawl.NewHTTPSitemapFetcher(http.DefaultClient)
 	crawlWorker := crawlAdapter{crawl: crawl.NewCrawl(scrapeWorker, robotsChecker, sitemapFetcher)}
 	executor := job.NewExecutor(scrapeWorker, crawlWorker, sinker)
@@ -125,7 +126,18 @@ func buildFetchClients(fetch jobspec.Fetch) (localClient, proxyClient *http.Clie
 	return localClient, proxyClient, nil
 }
 
-func (e *liveExecutor) createFetcher(manifests []*provider.Manifest, spec *jobspec.Spec) (*fetch.Fetcher, error) {
+// crawlDelayFor returns the per-host minimum delay a job must honor on top
+// of limits.rpsPerHost: robots.txt's Crawl-delay, but only for a crawl that
+// respects robots.txt -- a plain URL list never consults robots.txt, and
+// robots: ignore opts out of it entirely.
+func crawlDelayFor(spec *jobspec.Spec, robots *crawl.HTTPRobotsChecker) func(rawURL string) time.Duration {
+	if spec.Source.Crawl == nil || spec.Source.Crawl.Robots != "respect" {
+		return nil
+	}
+	return robots.CrawlDelay
+}
+
+func (e *liveExecutor) createFetcher(manifests []*provider.Manifest, spec *jobspec.Spec, crawlDelay func(rawURL string) time.Duration) (*fetch.Fetcher, error) {
 	localClient, proxyClient, err := buildFetchClients(spec.Fetch)
 	if err != nil {
 		return nil, err
@@ -141,7 +153,10 @@ func (e *liveExecutor) createFetcher(manifests []*provider.Manifest, spec *jobsp
 			CredentialsPath: e.credentialsPath,
 		},
 	}
-	throttle := fetch.NewThrottle(spec.Limits.RPS)
-	fetcher := fetch.NewFetcher(tierMap, spec.Limits.Concurrency, spec.Limits.Retries, fetch.Backoff, throttle)
+	pacer := fetch.Pacer{
+		Global:  fetch.NewThrottle(spec.Limits.RPS),
+		PerHost: fetch.NewHostThrottle(spec.Limits.RPSPerHost, crawlDelay),
+	}
+	fetcher := fetch.NewFetcher(tierMap, spec.Limits.Concurrency, spec.Limits.Retries, fetch.Backoff, pacer)
 	return fetcher, nil
 }

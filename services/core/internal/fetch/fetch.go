@@ -15,8 +15,10 @@ type Tier interface {
 	Fetch(ctx context.Context, cfg jobspec.Fetch, url string) (*tiers.Result, fault.Kind, error)
 }
 
+// Throttler paces requests; url is the target being fetched, so an
+// implementation can pace per host (see Pacer).
 type Throttler interface {
-	Wait(ctx context.Context) error
+	Wait(ctx context.Context, url string) error
 }
 
 var ErrUnknownTier = errors.New("fetch: unknown tier")
@@ -76,7 +78,7 @@ func (f *Fetcher) fetchTierWithRetries(ctx context.Context, tier Tier, cfg jobsp
 
 	for attempt := 1; attempt <= retries; attempt++ {
 		if f.throttle != nil {
-			if err := f.throttle.Wait(ctx); err != nil {
+			if err := f.throttle.Wait(ctx, url); err != nil {
 				return nil, "", err
 			}
 		}

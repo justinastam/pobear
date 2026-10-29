@@ -1,0 +1,22 @@
+args: crawl {{base}}/x --depth 0 --rps-per-host 2 --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "crawl": {
+          "seeds": [
+            "{{base}}/x"
+          ],
+          "sitemap": true
+        }
+      },
+      "fetch": {
+        "use": "local"
+      },
+      "limits": {
+        "rps": 16,
+        "rpsPerHost": 2
+      }
+    }
+stderr: ""
+exit: 0

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Decodo/pobear/internal/testutil"
 	"github.com/Decodo/pobear/services/core/internal/job/workers/crawl"
@@ -116,5 +117,54 @@ func TestHTTPRobotsCheckerFailsClosedOnMalformedRobotsTxt(t *testing.T) {
 	_, err := c.Allowed(context.Background(), srv.URL+"/page")
 	if err != nil {
 		t.Fatalf("expected no Go error even on a parse failure (it's encoded in the allowed result), got %v", err)
+	}
+}
+
+func TestHTTPRobotsCheckerCrawlDelayReadsWildcardGroup(t *testing.T) {
+	dir := t.TempDir()
+	writeFixture(t, dir, "robots.txt", "User-agent: somebot\nCrawl-delay: 30\n\nUser-agent: *\nCrawl-delay: 2.5\nDisallow: /private\n")
+	srv := testutil.NewFixtureServer(dir)
+	defer srv.Close()
+
+	c := crawl.NewHTTPRobotsChecker(srv.Client())
+	if _, err := c.Allowed(context.Background(), srv.URL+"/page"); err != nil {
+		t.Fatalf("Allowed: %v", err)
+	}
+
+	if got, want := c.CrawlDelay(srv.URL+"/other"), 2500*time.Millisecond; got != want {
+		t.Fatalf("CrawlDelay = %v, want %v (the User-agent: * group's, not somebot's)", got, want)
+	}
+}
+
+func TestHTTPRobotsCheckerCrawlDelayIsZeroWhenUnset(t *testing.T) {
+	dir := t.TempDir()
+	writeFixture(t, dir, "robots.txt", "User-agent: *\nDisallow: /private\n")
+	srv := testutil.NewFixtureServer(dir)
+	defer srv.Close()
+
+	c := crawl.NewHTTPRobotsChecker(srv.Client())
+	if _, err := c.Allowed(context.Background(), srv.URL+"/page"); err != nil {
+		t.Fatalf("Allowed: %v", err)
+	}
+
+	if got := c.CrawlDelay(srv.URL + "/page"); got != 0 {
+		t.Fatalf("CrawlDelay = %v, want 0 when robots.txt sets no Crawl-delay", got)
+	}
+}
+
+func TestHTTPRobotsCheckerCrawlDelayNeverFetches(t *testing.T) {
+	var fetches int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fetches++
+		_, _ = w.Write([]byte("User-agent: *\nCrawl-delay: 5\n"))
+	}))
+	defer srv.Close()
+
+	c := crawl.NewHTTPRobotsChecker(srv.Client())
+	if got := c.CrawlDelay(srv.URL + "/page"); got != 0 {
+		t.Fatalf("CrawlDelay before any Allowed call = %v, want 0 (nothing cached yet)", got)
+	}
+	if fetches != 0 {
+		t.Fatalf("CrawlDelay made %d requests, want 0 -- it must only read the cache", fetches)
 	}
 }

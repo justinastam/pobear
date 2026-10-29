@@ -42,6 +42,7 @@ type Fetch struct {
 type Limits struct {
 	Concurrency       int    `yaml:"concurrency,omitempty" json:"concurrency,omitempty"`
 	RPS               int    `yaml:"rps" json:"rps"`
+	RPSPerHost        int    `yaml:"rpsPerHost" json:"rpsPerHost"`
 	Retries           int    `yaml:"retries,omitempty" json:"retries,omitempty"`
 	Backoff           string `yaml:"backoff,omitempty" json:"backoff,omitempty"`
 	PluginConcurrency int    `yaml:"pluginConcurrency" json:"pluginConcurrency"`
