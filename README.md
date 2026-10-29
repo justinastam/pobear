@@ -78,6 +78,14 @@ pobear scrape urls.txt --extract markdown --out pages.ndjson
 
 This is useful when another step in your workflow already produces the URLs. Blank lines and lines beginning with `#` are ignored.
 
+When the list spans many sites, cap the rate per host as well as overall, so no single site gets hammered while the rest still run in parallel:
+
+```sh
+pobear scrape urls.txt --rps 50 --rps-per-host 2 --extract markdown --out pages.ndjson
+```
+
+Crawls also honor a site's `robots.txt` `Crawl-delay` unless you pass `--ignore-robots`.
+
 ### Save a reusable scraping job
 
 Print a job spec instead of executing the command:

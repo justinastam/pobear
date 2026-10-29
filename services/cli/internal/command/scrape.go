@@ -117,7 +117,7 @@ func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Pr
 	resolvedIn := jobgen.Input{
 		URLs: urls, FetchUse: fetchUse, Ladder: f.ladder, Proxy: f.proxy, Provider: f.provider, Template: f.template,
 		Profile: profile, Options: fetchOptions, Timeout: f.timeout, Headers: headers, Stages: stages,
-		Concurrency: &f.concurrency, RPS: &f.rps, Retries: &f.retries, SinkUse: sinkUse, SinkPath: sinkPath,
+		Concurrency: &f.concurrency, RPS: &f.rps, RPSPerHost: &f.rpsPerHost, Retries: &f.retries, SinkUse: sinkUse, SinkPath: sinkPath,
 	}
 	defaultsIn := jobgen.Input{URLs: urls, FetchUse: "local"}
 

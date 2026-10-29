@@ -82,6 +82,7 @@ type commonFlags struct {
 	concurrency      int
 	retries          int
 	rps              int
+	rpsPerHost       int
 	wasSet           func(name string) bool
 }
 
@@ -110,6 +111,7 @@ func registerCommonFlags(cmd *cobra.Command, f *commonFlags, defaultRPS int) {
 	flags.IntVarP(&f.concurrency, "concurrency", "c", 8, "maximum concurrent fetches")
 	flags.IntVarP(&f.retries, "retries", "r", 3, "retries per fetch before giving up")
 	flags.IntVar(&f.rps, "rps", defaultRPS, "requests/sec across every host combined (0 = unlimited)")
+	flags.IntVar(&f.rpsPerHost, "rps-per-host", 0, "requests/sec to any single host, on top of --rps (0 = unlimited); a crawl also honors a stricter robots.txt Crawl-delay")
 }
 
 func resolveFetchUse(f *commonFlags) (string, *cliError) {

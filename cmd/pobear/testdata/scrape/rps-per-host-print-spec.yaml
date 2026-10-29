@@ -1,0 +1,19 @@
+args: scrape {{base}}/x --rps 50 --rps-per-host 2 --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/x"
+        ]
+      },
+      "fetch": {
+        "use": "local"
+      },
+      "limits": {
+        "rps": 50,
+        "rpsPerHost": 2
+      }
+    }
+stderr: ""
+exit: 0

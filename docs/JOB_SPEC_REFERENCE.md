@@ -196,10 +196,22 @@ moving `_Auto` to a newer version isn't automatically reflected anywhere else.
 |---|---|---|---|
 | `concurrency` | `int` | `8` | `> 0` |
 | `rps` | `int` | `0` (scrape CLI) / `16` (crawl CLI); `0` in a bare spec | `0` = unlimited; negative rejected; caps total requests/sec across every host combined, not per host |
+| `rpsPerHost` | `int` | `0` | `0` = unlimited; negative rejected; caps requests/sec to any single host (the target URL's `host[:port]`), enforced in addition to `rps` |
 | `retries` | `int` | `3` | `>= 1` (the first attempt counts) |
 | `backoff` | enum | `exponential` (CLI default) | only `exponential` is currently a valid value — anything else rejected, not silently substituted |
 | `pluginConcurrency` | `int` | `0` | `__rpc` mode only; ignored elsewhere |
 | `pluginTimeout` | duration string | `30s` | `__rpc` mode only; ignored elsewhere |
+
+`rps` and `rpsPerHost` stack: each attempt (retries included) first waits for its
+host's next free slot, then for a slot in the job-wide `rps` budget. For a crawl
+with `source.crawl.robots: respect`, each host's `robots.txt` `Crawl-delay` (from
+its `User-agent: *` group) is a further per-host minimum gap: the effective gap
+for a host is the longer of `Crawl-delay` and `1/rpsPerHost`, so whichever is
+stricter wins, with `rps` applied on top. `robots: ignore` skips `Crawl-delay`,
+and a `source.urls` job never reads `robots.txt`. `Crawl-delay` takes effect from
+the first request after that host's `robots.txt` has been read (before the
+crawl's first non-seed URL on that host) and is not capped — `maxDuration`
+bounds a crawl against an extreme value.
 
 `concurrency` genuinely bounds how many fetches run at once, for both a plain
 URL list and a crawl's frontier. For a crawl specifically, `source.crawl.maxPages`
@@ -317,7 +329,7 @@ a crawl:
   value of the wrong type; an `enum` value outside `values`; a `string` value
   that doesn't match `pattern`; an `int` value outside `min`/`max`.
 - `limits`: any field `<= 0` where the rule requires `> 0`; `backoff` not
-  `exponential`; negative `rps`.
+  `exponential`; negative `rps` or `rpsPerHost`.
 - `stages[].use` not one of the four known extraction-method names; a stage using
   `plugin` outside `__rpc` mode; a stage using `css` with no `fields`.
 - `sink.use` outside its enum; `path` missing when required, or present when
@@ -386,6 +398,7 @@ fetch:
 limits:
   concurrency: 8
   rps: 2
+  rpsPerHost: 1
   retries: 3
   backoff: exponential
   pluginConcurrency: 4

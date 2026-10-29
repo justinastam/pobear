@@ -7,7 +7,7 @@ func parseLimits(root map[string]any) (Limits, *ValidationError) {
 	if !ok {
 		return Limits{Concurrency: 8, Retries: 3, Backoff: "exponential", PluginTimeout: "30s"}, nil
 	}
-	m, err := utils.AsMapping(raw, "limits", "concurrency", "rps", "retries", "backoff", "pluginConcurrency", "pluginTimeout")
+	m, err := utils.AsMapping(raw, "limits", "concurrency", "rps", "rpsPerHost", "retries", "backoff", "pluginConcurrency", "pluginTimeout")
 	if err != nil {
 		return Limits{}, err
 	}
@@ -26,6 +26,14 @@ func parseLimits(root map[string]any) (Limits, *ValidationError) {
 	}
 	if rps < 0 {
 		return Limits{}, utils.Errorf("limits.rps", "`limits.rps` must be >= 0, got %d", rps)
+	}
+
+	rpsPerHost, err := utils.GetInt(m, "rpsPerHost", "limits.rpsPerHost", 0)
+	if err != nil {
+		return Limits{}, err
+	}
+	if rpsPerHost < 0 {
+		return Limits{}, utils.Errorf("limits.rpsPerHost", "`limits.rpsPerHost` must be >= 0, got %d", rpsPerHost)
 	}
 
 	retries, err := utils.GetInt(m, "retries", "limits.retries", 3)
@@ -54,6 +62,7 @@ func parseLimits(root map[string]any) (Limits, *ValidationError) {
 	return Limits{
 		Concurrency:       concurrency,
 		RPS:               rps,
+		RPSPerHost:        rpsPerHost,
 		Retries:           retries,
 		Backoff:           backoff,
 		PluginConcurrency: pluginConcurrency,

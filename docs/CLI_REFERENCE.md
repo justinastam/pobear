@@ -64,13 +64,29 @@ $ pobear scrape urls.txt --print-spec
 | `-c, --concurrency <n>` | 8 | |
 | `-r, --retries <n>` | 3 | |
 | `--rps <n>` | 0 (unlimited) | requests/sec across every host combined |
+| `--rps-per-host <n>` | 0 (unlimited) | requests/sec to any single host, enforced on top of `--rps` — see below |
+
+**Rate limits.** `--rps` and `--rps-per-host` stack: every request waits for its
+host's next free slot first, then for a slot in the job-wide budget, so neither
+limit is ever exceeded. `--rps` alone caps the whole job but lets every request
+land on the same host; `--rps-per-host` alone keeps each host polite while a list
+spread over many domains still runs at full concurrency. "Host" is the target
+URL's `host[:port]`, regardless of which tier fetches it, and retries count
+against both limits like any other attempt.
+
+```
+$ pobear scrape urls.txt --rps 50 --rps-per-host 2 --extract markdown --out pages.ndjson
+```
+
+Up to 50 requests/sec in total, but never more than 2/sec to any one host.
+`crawl` additionally honors `robots.txt`'s `Crawl-delay` — see `crawl` below.
 
 Not every flag gets a single-letter shorthand — `pflag` limits a shorthand to exactly
 one ASCII character, so it's reserved for flags that are frequent enough to be worth
 it and don't collide with something more central. `--proxy`/`--provider`/`--profile`
 all start with `p` and are equally central, so none of them claims it rather than
 picking a winner; `--render` is itself sugar for `--opt`, so it doesn't need its own
-shortcut; `--print-spec`/`--print-spec-verbose`/`--rps` are debugging/advanced knobs
+shortcut; `--print-spec`/`--print-spec-verbose`/`--rps`/`--rps-per-host` are debugging/advanced knobs
 left fully explicit on purpose. `--css` keeps its full name too — its value
 (`name=selector[@attr]`) is already the verbose part, so a shorter flag name saves
 little. `--header` is the one repeatable, verbose-valued flag that does claim a
@@ -135,7 +151,7 @@ $ pobear scrape https://ip.decodo.com --print-spec-verbose
   "version": 1,
   "source": { "urls": ["https://ip.decodo.com"] },
   "fetch": { "use": "local", "ladder": false, "profile": "chrome", "timeout": "30s", "noRedirects": false },
-  "limits": { "concurrency": 8, "rps": 0, "retries": 3, "backoff": "exponential", "pluginConcurrency": 0, "pluginTimeout": "30s" },
+  "limits": { "concurrency": 8, "rps": 0, "rpsPerHost": 0, "retries": 3, "backoff": "exponential", "pluginConcurrency": 0, "pluginTimeout": "30s" },
   "stages": [],
   "sink": { "use": "stdout" }
 }
@@ -468,6 +484,20 @@ Everything `scrape` has, plus:
 | `--ignore-robots` | off | `robots.txt` is respected by default |
 | `--no-redirects` | off | treat a `3xx` response as a dead end instead of following it |
 | `--rps <n>` | **16** | (different default from `scrape`) |
+| `--rps-per-host <n>` | 0 (unlimited) | same as `scrape`, plus `robots.txt` `Crawl-delay` — see below |
+
+**`Crawl-delay`.** Unless `--ignore-robots` is set, a crawl also honors the
+`Crawl-delay` directive from the `User-agent: *` group of each host's
+`robots.txt` as a per-host minimum gap between requests. Precedence, per host:
+the stricter (longer) of `Crawl-delay` and `1/--rps-per-host` wins, and `--rps`
+still applies on top of both. So `Crawl-delay: 5` holds a host to one request
+every 5s even with `--rps-per-host 0`, while `--rps-per-host 1` beats a
+`Crawl-delay: 0.2`. With `--ignore-robots`, `Crawl-delay` is ignored along with
+the rest of `robots.txt`. A host's delay applies from the first request after its
+`robots.txt` was read — which always happens before the first non-seed URL on
+that host is fetched — and is not capped: use `--max-duration` to bound a crawl
+against a very large delay. `scrape` never reads `robots.txt`, so it has no
+`Crawl-delay` handling.
 
 `--timeout` (above, inherited from `scrape`) caps one fetch; `--max-duration` caps the
 whole crawl — a crawl can have thousands of individually-fast fetches and still run
@@ -500,7 +530,7 @@ $ pobear crawl https://example.com --depth 2 --print-spec-verbose
     "maxPages": 100, "maxDuration": "", "scope": "same-host", "include": [], "exclude": [],
     "sitemap": true, "robots": "respect" } },
   "fetch": { "use": "local", "ladder": false, "profile": "chrome", "timeout": "30s", "noRedirects": false },
-  "limits": { "concurrency": 8, "rps": 16, "retries": 3, "backoff": "exponential", "pluginConcurrency": 0, "pluginTimeout": "30s" },
+  "limits": { "concurrency": 8, "rps": 16, "rpsPerHost": 0, "retries": 3, "backoff": "exponential", "pluginConcurrency": 0, "pluginTimeout": "30s" },
   "stages": [],
   "sink": { "use": "stdout" }
 }

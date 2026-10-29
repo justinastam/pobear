@@ -246,11 +246,13 @@ func TestFetchRespectsContextCancellation(t *testing.T) {
 
 type fakeThrottle struct {
 	calls int
+	urls  []string
 	err   error
 }
 
-func (f *fakeThrottle) Wait(_ context.Context) error {
+func (f *fakeThrottle) Wait(_ context.Context, url string) error {
 	f.calls++
+	f.urls = append(f.urls, url)
 	return f.err
 }
 
@@ -271,6 +273,11 @@ func TestFetchWaitsOnThrottleBeforeEveryAttempt(t *testing.T) {
 	}
 	if throttle.calls != 3 {
 		t.Fatalf("throttle.Wait called %d times, want 3 (once per attempt, retries included)", throttle.calls)
+	}
+	for i, u := range throttle.urls {
+		if u != "https://a.test" {
+			t.Fatalf("throttle.Wait call %d got url %q, want the fetched target (so per-host pacing can key on it)", i, u)
+		}
 	}
 }
 

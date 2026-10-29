@@ -1,0 +1,8 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local}
+  limits: {rpsPerHost: "two"}
+wantErr: true
+wantField: limits.rpsPerHost
+wantMessage: "`limits.rpsPerHost` must be an integer, got two"
