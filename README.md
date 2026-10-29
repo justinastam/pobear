@@ -45,6 +45,13 @@ If you have `jq`, inspect the first record's extracted fields:
 head -1 books.ndjson | jq '.data'
 ```
 
+For a spreadsheet instead, end the file name in `.csv`. Each page becomes a row with `url`, `status`, `tier`, and one column per `--css` field; a field with several matches lists them on separate lines within its cell:
+
+```sh
+pobear crawl https://books.toscrape.com/ --depth 1 --max-pages 10 \
+  --css 'title=h3 a@title' --css 'price=.price_color' --out books.csv
+```
+
 Without `--out`, results stream to stdout. Run summaries and failure details go to stderr, keeping them separate from the data you pipe or save.
 
 Prefer an interactive interface? Run `pobear` with no arguments to open the terminal wizard, configure a scrape or crawl, inspect results, and save a job.
@@ -217,7 +224,7 @@ Direct fetching retrieves HTML without executing JavaScript. Use `--provider dec
 
 ### What output formats does pobear support?
 
-The default is one NDJSON object per fetched page, including page metadata, content, and extracted fields. Job specs can also save a JSON array or YAML sequence. Use `--bare` for a single extracted value, or `--out results/` to save each target separately with an `index.json` file.
+The default is one NDJSON object per fetched page, including page metadata, content, and extracted fields. `--out` with a `.csv` file name saves one spreadsheet row per page. Job specs can also save a JSON array or YAML sequence. Use `--bare` for a single extracted value, or `--out results/` to save each target separately with an `index.json` file.
 
 ### Does pobear switch fetching methods automatically?
 

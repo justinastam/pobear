@@ -26,6 +26,15 @@ func isDirOut(outPath string) bool {
 	return err == nil && info.IsDir()
 }
 
+// fileSinkUse picks the sink for a non-directory --out path: csv for a .csv
+// extension, NDJSON for anything else.
+func fileSinkUse(outPath string) string {
+	if strings.EqualFold(filepath.Ext(outPath), ".csv") {
+		return "csv"
+	}
+	return "ndjson"
+}
+
 type rawItem struct {
 	URL    string         `json:"url"`
 	Status int            `json:"status"`

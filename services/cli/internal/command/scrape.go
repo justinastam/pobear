@@ -101,7 +101,7 @@ func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Pr
 
 	sinkUse, sinkPath := "stdout", ""
 	if f.out != "" && !isDirOut(f.out) {
-		sinkUse, sinkPath = "ndjson", f.out
+		sinkUse, sinkPath = fileSinkUse(f.out), f.out
 	}
 
 	profile, cerr := resolveProfile(f, fetchUse)

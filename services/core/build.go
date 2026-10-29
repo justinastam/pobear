@@ -91,6 +91,7 @@ func (e *liveExecutor) createSinker(spec *jobspec.Spec) *sink.Sinker {
 		"ndjson": &sinks.NDJSON{Path: spec.Sink.Path},
 		"json":   &sinks.JSON{Path: spec.Sink.Path},
 		"yaml":   &sinks.YAML{Path: spec.Sink.Path},
+		"csv":    &sinks.CSV{Path: spec.Sink.Path, DataKeys: jobspec.DataKeys(spec.Stages)},
 	}
 	sinker := sink.NewSinker(sinkMap, spec.Sink.Use)
 	return sinker

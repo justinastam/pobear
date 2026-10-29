@@ -266,8 +266,8 @@ lets it sit alongside other fields (`css`, `markdown`) in the same `data` map.
 
 | Field | Type | Default | Rule |
 |---|---|---|---|
-| `use` | enum: `stdout` \| `ndjson` \| `json` \| `yaml` \| `stream` | `stdout` | anything else rejected |
-| `path` | string | — | **required** when `use` is `ndjson`/`json`/`yaml`; **rejected** when `use` is `stdout`/`stream` |
+| `use` | enum: `stdout` \| `ndjson` \| `json` \| `yaml` \| `csv` \| `stream` | `stdout` | anything else rejected |
+| `path` | string | — | **required** when `use` is `ndjson`/`json`/`yaml`/`csv`; **rejected** when `use` is `stdout`/`stream` |
 
 Every fetched item also carries a top-level `tier` field (`local`, `proxy`, or
 `provider`) — which tier actually served that URL, regardless of `sink.use`. It's
@@ -281,6 +281,26 @@ just `fetch.use` echoed back on every item.
 - `yaml` buffers every item and writes one YAML sequence to `path` on completion —
   same buffer-until-complete shape as `json`, same field names, just YAML instead
   of JSON on disk.
+- `csv` streams one row per item to `path` as items complete, like `ndjson`.
+  Built for spreadsheets, so it flattens each item rather than carrying the
+  whole envelope:
+  - **Columns**: `url`, `status`, `tier`, then one column per `data` key the
+    `stages` write — in stage order, with a `css` stage's fields sorted by name
+    (`fields` is a mapping, so it has no order of its own). With no stages
+    writing any key (e.g. `stages: []`), a single `body` column takes their
+    place. The header is fixed before the first item arrives, so it can't
+    depend on what a page actually produced: a `data` key the stages don't
+    declare (only possible from a `plugin` stage) is dropped, not added as a
+    late column. The other envelope fields (`finalUrl`, `parentUrl`, `depth`,
+    `headers`, and `body` when stages are set) aren't written — use `ndjson` for those.
+  - **Cells**: a list value — every `css` field is one — is its values joined
+    with a newline (`\n`), so one match reads as the plain value and no match
+    as an empty cell. A string is written as-is; any other non-list value is
+    JSON-encoded. Quoting follows RFC 4180 (Go's `encoding/csv`): a cell holding
+    a comma, quote, or newline is wrapped in double quotes, inner quotes doubled.
+  - Data column names aren't prefixed, so a `css` field named `url`, `status`,
+    `tier`, or `body` produces a second column with that same header — the
+    header stays positional, nothing is overwritten.
 - `stream` pushes items to the RPC streamer instead of a local file/stdout. Like the
   `plugin` extraction method (§6), it's only meaningful when there's a wire connection to push
   over: a `sink.use: stream` spec is rejected outside `__rpc` mode, a clear error
@@ -288,8 +308,8 @@ just `fetch.use` echoed back on every item.
 - A closed sink never silently accepts more items: calling `Write` after `Close`
   returns a non-nil error, on all sink kinds.
 - `Close` with zero items written still produces valid output: `json`/`yaml` write
-  an empty array/sequence (`[]`, not `null`), and `ndjson` still creates `path` as
-  an empty (0-byte) file — a downstream reader never sees a missing file just
+  an empty array/sequence (`[]`, not `null`), `csv` writes just its header row,
+  and `ndjson` still creates `path` as an empty (0-byte) file — a downstream reader never sees a missing file just
   because nothing was fetched.
 
 ---

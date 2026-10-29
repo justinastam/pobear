@@ -6,5 +6,5 @@ stdin: |
     sink: {use: ndjson}
 stdout: ""
 stderr: |
-    pobear: spec: `sink.path` is required when `sink.use` is `ndjson`, `json`, or `yaml`
+    pobear: spec: `sink.path` is required when `sink.use` is `ndjson`, `json`, `yaml`, or `csv`
 exit: 3

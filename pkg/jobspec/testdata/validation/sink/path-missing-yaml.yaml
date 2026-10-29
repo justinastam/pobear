@@ -5,4 +5,4 @@ input: |
   sink: {use: yaml}
 wantErr: true
 wantField: sink.path
-wantMessage: "`sink.path` is required when `sink.use` is `ndjson`, `json`, or `yaml`"
+wantMessage: "`sink.path` is required when `sink.use` is `ndjson`, `json`, `yaml`, or `csv`"

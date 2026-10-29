@@ -36,6 +36,23 @@ func TestIsDirOut(t *testing.T) {
 	}
 }
 
+func TestFileSinkUse(t *testing.T) {
+	tests := map[string]string{
+		"books.csv":        "csv",
+		"BOOKS.CSV":        "csv",
+		"out/books.csv":    "csv",
+		"pages.ndjson":     "ndjson",
+		"pages.json":       "ndjson",
+		"no-extension":     "ndjson",
+		"books.csv.ndjson": "ndjson",
+	}
+	for path, want := range tests {
+		if got := fileSinkUse(path); got != want {
+			t.Errorf("fileSinkUse(%q) = %q, want %q", path, got, want)
+		}
+	}
+}
+
 func TestExtractRawValue(t *testing.T) {
 	if _, err := extractRawValue(map[string]any{}, "title"); err == nil {
 		t.Fatal("expected an error when the field was never produced")

@@ -98,7 +98,7 @@ func crawlRun(ctx context.Context, runner JobRunner, providers *providerator.Pro
 
 	sinkUse, sinkPath := "stdout", ""
 	if f.out != "" && !isDirOut(f.out) {
-		sinkUse, sinkPath = "ndjson", f.out
+		sinkUse, sinkPath = fileSinkUse(f.out), f.out
 	}
 
 	profile, cerr := resolveProfile(f, fetchUse)

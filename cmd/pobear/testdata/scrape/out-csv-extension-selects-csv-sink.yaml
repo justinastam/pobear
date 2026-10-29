@@ -1,0 +1,27 @@
+args: scrape {{base}}/x --css title=h1 --out books.csv --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/x"
+        ]
+      },
+      "fetch": {
+        "use": "local"
+      },
+      "stages": [
+        {
+          "use": "css",
+          "fields": {
+            "title": "h1"
+          }
+        }
+      ],
+      "sink": {
+        "use": "csv",
+        "path": "books.csv"
+      }
+    }
+stderr: ""
+exit: 0
