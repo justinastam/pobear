@@ -20,7 +20,7 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 	stages := make([]Stage, 0, len(list))
 	for i, item := range list {
 		field := fmt.Sprintf("stages[%d]", i)
-		m, err := utils.AsMapping(item, field, "use", "fields", "id")
+		m, err := utils.AsMapping(item, field, "use", "fields", "items", "id")
 		if err != nil {
 			return nil, err
 		}
@@ -48,6 +48,16 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 			}
 			stage.Fields = fields
 		}
+		if itemsRaw, ok := m["items"]; ok {
+			if use != "css" {
+				return nil, utils.Errorf(field+".items", "`%s.items` is only allowed on a `css` stage", field)
+			}
+			items, _ := itemsRaw.(string)
+			if items == "" {
+				return nil, utils.Errorf(field+".items", "`%s.items` must be a non-empty selector string", field)
+			}
+			stage.Items = items
+		}
 		if idRaw, ok := m["id"]; ok {
 			stage.ID, _ = idRaw.(string)
 		}
@@ -61,6 +71,10 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 
 	return stages, nil
 }
+
+// ItemsDataKey is the data key a css stage with `items` set writes its
+// records under, in place of one key per field.
+const ItemsDataKey = "items"
 
 func checkStageDataKeyCollisions(stages []Stage) *ValidationError {
 	claimedBy := make(map[string]int)
@@ -85,6 +99,9 @@ func stageDataKeys(s Stage) []string {
 	case "markdown":
 		return []string{"markdown"}
 	case "css":
+		if s.Items != "" {
+			return []string{ItemsDataKey}
+		}
 		keys := make([]string, 0, len(s.Fields))
 		for k := range s.Fields {
 			keys = append(keys, k)

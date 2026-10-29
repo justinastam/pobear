@@ -55,6 +55,7 @@ $ pobear scrape urls.txt --print-spec
 | `-t, --timeout <duration>` | `30s` | per-request timeout |
 | `-e, --extract raw\|markdown` | — | add an extraction stage |
 | `--css name=selector[@attr]` | — | repeatable; each field name must be non-empty and set at most once |
+| `--items <selector>` | — | one record per matching element, each `--css` field evaluated inside it — written to `data.items`; requires `--css` — see below |
 | `-H, --header "name: value"` | — | repeatable; sets `fetch.headers` (`JOB_SPEC_REFERENCE.md` §4) — each name must be non-empty and set at most once |
 | `-o, --out <path>` | stdout | write NDJSON to a file, or one file per target plus an `index.json` if `<path>` is a directory — see below |
 | `-b, --bare` | off | print just the extracted value, no envelope — see below |
@@ -158,6 +159,39 @@ $ pobear scrape https://example.com --css 'title=h1' --css 'link=a@href'
 {"url":"https://example.com", …, "data":{"title":["Example Domain"],"link":["https://www.iana.org/domains/example"]}}
 ```
 
+### `--items` — one record per matched element
+
+Each `--css` field on its own returns every match on the page, so a listing page
+comes back as parallel arrays you'd have to zip yourself. `--items <selector>`
+scopes the fields instead: every element it matches becomes one record, and each
+`--css` field is evaluated *inside* that element. The records land in
+`data.items`, in document order, in place of the per-field keys:
+
+```
+$ pobear scrape https://books.toscrape.com/ --css 'title=h3 a@title' --css 'price=.price_color'
+{"url":"https://books.toscrape.com/", …, "data":{"price":["£51.77","£53.74",…],"title":["A Light in the Attic","Tipping the Velvet",…]}}
+
+$ pobear scrape https://books.toscrape.com/ --items 'article.product_pod' --css 'title=h3 a@title' --css 'price=.price_color'
+{"url":"https://books.toscrape.com/", …, "data":{"items":[{"price":"£51.77","title":"A Light in the Attic"},{"price":"£53.74","title":"Tipping the Velvet"},…]}}
+```
+
+Inside a record each field is a single string — the first match within that
+element — or `null` when nothing inside it matched, so a missing price on one
+product stays on that product's record instead of shifting every later value. An
+empty selector refers to the matched element itself: `--items 'a.result' --css
+'url=@href'`. The full value rule is in `JOB_SPEC_REFERENCE.md` §6.1; `--items`
+is the CLI surface for a `css` stage's `items` field.
+
+`--items` without any `--css` field has nothing to put in a record and is
+rejected before anything is fetched:
+
+```
+$ pobear scrape https://example.com --items article
+pobear: --items requires at least one --css field to extract from each matched element
+$ echo $?
+3
+```
+
 ### `-H, --header` — extra request headers
 
 Repeatable, `"name: value"` shape (curl's own `-H` convention), each name set at
@@ -195,8 +229,10 @@ fetched 200, errors 0, skipped 0, empty 200
 ```
 
 A css field that matched nothing writes an empty list, and `raw`/`markdown` write
-an empty string; either counts as empty. An item is only empty when **every**
-field came back empty — one field matching is enough to count it as extracted.
+an empty string; either counts as empty. With `--items`, `data.items` counts as
+empty when it holds no records, or only records whose fields are all `null`. An
+item is only empty when **every** field came back empty — one field matching is
+enough to count it as extracted.
 
 This is the closest pobear gets to reporting a soft block it doesn't recognize. A
 `200` challenge page from a known anti-bot vendor (Amazon's CAPTCHA, Cloudflare,
@@ -250,7 +286,15 @@ one URL is targeted and at most one extraction result would otherwise land in `d
 ambiguous and rejected. Since `css` always writes a list (`JOB_SPEC_REFERENCE.md` §6),
 `--bare` additionally requires that field's list to hold exactly one element — one
 CSS field matching zero or 2+ elements is also rejected as ambiguous, same as multiple
-fields.
+fields. `--items` always produces a list of records rather than one value, so it's
+rejected with `--bare` up front:
+
+```
+$ pobear scrape https://example.com --items article --css 'title=h3' --bare
+pobear: --bare prints a single value, but --items produces a list of records -- drop --bare and read data.items instead
+$ echo $?
+3
+```
 
 ```
 $ pobear scrape https://example.com --extract markdown --bare
@@ -829,13 +873,15 @@ Local/Proxy/Provider` instead of starting.
 
 ### Changing "Extract" reacts the same way
 
-Moving `Extract` to `css fields` replaces the single-line field with an editable
-list; `bare` and `raw` return the fetched body untouched (`bare` strips the
+Moving `Extract` to `css fields` replaces the single-line field with an optional
+`Items` selector (the `--items` equivalent — leave it blank for per-field lists)
+and an editable list of fields; `bare` and `raw` return the fetched body untouched (`bare` strips the
 result envelope in item detail too, `raw` keeps it), and `markdown` adds a
 markdown-conversion stage with no further fields:
 
 ```
 │   Extract     › css fields               (bare / raw / markdown / css fields)        │
+│     Items                                (optional: one record per match)            │
 │     title         h1                                                                 │
 │     price         .price@data-value                                                  │
 │     + add field                                                                      │
@@ -917,6 +963,7 @@ be deleted from here — there's no file to remove.
 | provider-declared fields (e.g. Headless / Geo, on the Provider tier screen) | `fetch.options.<name>` (provider only, per-manifest, per-template) |
 | Extract (`bare`/`raw`) | no stage added; `bare` also strips the envelope in item detail (CLI equivalent: `--bare`) |
 | Extract (`markdown`/`css fields`) | a stage in the pipeline (`markdown` / `css`) |
+| Items (under `css fields`) | the `css` stage's `items` (CLI equivalent: `--items`) |
 | Max pages (crawl only) | `source.crawl.maxPages` |
 | Sitemap (crawl only) | `source.crawl.sitemap` |
 | Robots (crawl only) | `source.crawl.robots` (`respect` / `ignore`) |

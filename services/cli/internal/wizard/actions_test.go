@@ -245,6 +245,23 @@ func TestBuildJobSpecCSSFieldsFiltersBlankPairs(t *testing.T) {
 	}
 }
 
+func TestBuildJobSpecCSSItemsSetsStageItems(t *testing.T) {
+	s := newFormState()
+	s.url = "https://example.com"
+	s.localConfigured = true
+	s.extract = "css fields"
+	s.cssItems = " article.product_pod "
+	s.cssFields = []cssFieldPair{{name: "title", selector: "h3 a@title"}}
+
+	spec, err := buildJobSpec(s, "")
+	if err != nil {
+		t.Fatalf("buildJobSpec: %v", err)
+	}
+	if len(spec.Stages) != 1 || spec.Stages[0].Items != "article.product_pod" {
+		t.Fatalf("Stages = %+v, want one css stage with items %q", spec.Stages, "article.product_pod")
+	}
+}
+
 func TestBuildJobSpecBareRunsNoStage(t *testing.T) {
 	s := newFormState()
 	s.url = "https://example.com"

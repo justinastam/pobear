@@ -1,0 +1,24 @@
+args: scrape {{base}}/x --items article --css title=h3 --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/x"
+        ]
+      },
+      "fetch": {
+        "use": "local"
+      },
+      "stages": [
+        {
+          "use": "css",
+          "fields": {
+            "title": "h3"
+          },
+          "items": "article"
+        }
+      ]
+    }
+stderr: ""
+exit: 0

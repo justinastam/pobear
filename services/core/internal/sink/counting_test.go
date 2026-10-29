@@ -35,6 +35,9 @@ func TestEmptyCounterCountsItemsWithNoExtractedValue(t *testing.T) {
 		{name: "non-empty markdown string", data: map[string]any{"markdown": "# Title"}, want: 0},
 		{name: "one of two fields matched", data: map[string]any{"a": []string{}, "b": []string{"x"}}, want: 0},
 		{name: "no data at all", data: nil, want: 1},
+		{name: "items matched no element", data: map[string]any{"items": []map[string]any{}}, want: 1},
+		{name: "items matched but no field inside did", data: map[string]any{"items": []map[string]any{{"title": nil}, {"title": nil}}}, want: 1},
+		{name: "one item field matched", data: map[string]any{"items": []map[string]any{{"title": nil}, {"title": "A"}}}, want: 0},
 	}
 
 	for _, c := range cases {

@@ -69,13 +69,13 @@ func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Pr
 		return 0, cerr
 	}
 
-	stages, cerr := buildStages(f.extract, f.css)
+	stages, cerr := buildStages(f.extract, f.css, f.items)
 	if cerr != nil {
 		return 0, cerr
 	}
 
 	names := extractedFieldNames(f.extract, f.css)
-	if cerr := validateBare(f.bare, names); cerr != nil {
+	if cerr := validateBare(f.bare, names, f.items); cerr != nil {
 		return 0, cerr
 	}
 	if cerr := validateBareSingleTarget(f.bare, isDirOut(f.out), len(urls)); cerr != nil {

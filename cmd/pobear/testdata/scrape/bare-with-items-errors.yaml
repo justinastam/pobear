@@ -1,0 +1,5 @@
+args: scrape https://example.com --items article --css title=h3 --bare
+stdout: ""
+stderr: |
+    pobear: --bare prints a single value, but --items produces a list of records -- drop --bare and read data.items instead
+exit: 3

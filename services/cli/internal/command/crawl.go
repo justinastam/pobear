@@ -66,13 +66,13 @@ func (c *Crawl) Run(ctx context.Context, args []string, stdin io.Reader, stdout,
 }
 
 func crawlRun(ctx context.Context, runner JobRunner, providers *providerator.Providerator, credentialsPath, target string, f *commonFlags, crawlIn *jobgen.CrawlInput, noRedirects bool, stdout, stderr io.Writer) (int, *cliError) {
-	stages, cerr := buildStages(f.extract, f.css)
+	stages, cerr := buildStages(f.extract, f.css, f.items)
 	if cerr != nil {
 		return 0, cerr
 	}
 
 	names := extractedFieldNames(f.extract, f.css)
-	if cerr := validateBare(f.bare, names); cerr != nil {
+	if cerr := validateBare(f.bare, names, f.items); cerr != nil {
 		return 0, cerr
 	}
 	if cerr := validateBareCrawlDepth(f.bare, isDirOut(f.out), crawlIn.Depth); cerr != nil {

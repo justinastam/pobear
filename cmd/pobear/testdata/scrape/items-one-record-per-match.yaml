@@ -1,0 +1,8 @@
+args: scrape {{base}}/books.html --items article.product_pod --css title=h3>a@title --css price=.price_color --css rating=.missing
+stdout: |
+    {"url":"{{base}}/books.html","finalUrl":"{{base}}/books.html","parentUrl":"","status":200,"body":"<article class=\"product_pod\"><h3><a title=\"A Light in the Attic\">A Light in the …</a></h3><p class=\"price_color\">£51.77</p></article><article class=\"product_pod\"><h3><a title=\"Tipping the Velvet\">Tipping the Velvet</a></h3><p class=\"price_color\">£53.74</p></article>","depth":0,"data":{"items":[{"price":"£51.77","rating":null,"title":"A Light in the Attic"},{"price":"£53.74","rating":null,"title":"Tipping the Velvet"}]},"tier":"local"}
+stderr: |
+    fetched 1, errors 0, skipped 0
+exit: 0
+fixtures:
+    books.html: <article class="product_pod"><h3><a title="A Light in the Attic">A Light in the …</a></h3><p class="price_color">£51.77</p></article><article class="product_pod"><h3><a title="Tipping the Velvet">Tipping the Velvet</a></h3><p class="price_color">£53.74</p></article>
