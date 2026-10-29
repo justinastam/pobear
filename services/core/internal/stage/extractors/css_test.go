@@ -73,7 +73,7 @@ func TestCSSRun(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			css := extractors.CSS{}
-			results, err := css.Run(context.Background(), []byte(c.body), jobspec.Stage{Use: "css", Fields: c.fields})
+			results, err := css.Run(context.Background(), []byte(c.body), "https://a.test/", jobspec.Stage{Use: "css", Fields: c.fields})
 			if c.wantErr {
 				if err == nil {
 					t.Fatalf("expected an error, got nil")

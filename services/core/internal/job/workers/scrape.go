@@ -15,7 +15,7 @@ type Fetcher interface {
 }
 
 type Stager interface {
-	Run(ctx context.Context, body []byte, cfgs []jobspec.Stage) (data map[string]any, err error)
+	Run(ctx context.Context, body []byte, pageURL string, cfgs []jobspec.Stage) (data map[string]any, err error)
 }
 
 type Sinker interface {
@@ -54,7 +54,7 @@ func (s *Scrape) Run(ctx context.Context, spec *jobspec.Spec, url, parentURL str
 		}
 	}
 
-	data, stageErr := s.stager.Run(ctx, result.Body, spec.Stages)
+	data, stageErr := s.stager.Run(ctx, result.Body, result.FinalURL, spec.Stages)
 	if stageErr != nil {
 		return nil, "", "", stageErr
 	}

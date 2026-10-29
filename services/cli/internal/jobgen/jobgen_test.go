@@ -97,6 +97,26 @@ func TestBuildWithHeaders(t *testing.T) {
 	}
 }
 
+func TestBuildLinksStageKeepsIncludeExclude(t *testing.T) {
+	in := jobgen.Input{
+		URLs:     []string{"https://example.com"},
+		FetchUse: "local",
+		Stages:   []jobspec.Stage{{Use: "links", Include: []string{"**/blog/**"}, Exclude: []string{"**/tag/**"}}},
+	}
+
+	got, err := jobgen.Build(in)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if len(got.Stages) != 1 || got.Stages[0].Use != "links" {
+		t.Fatalf("Stages = %+v, want one links stage", got.Stages)
+	}
+	s := got.Stages[0]
+	if len(s.Include) != 1 || s.Include[0] != "**/blog/**" || len(s.Exclude) != 1 || s.Exclude[0] != "**/tag/**" {
+		t.Fatalf("Include/Exclude = %v/%v, want [**/blog/**]/[**/tag/**]", s.Include, s.Exclude)
+	}
+}
+
 func TestBuildFetchDocIncludesLadderWhenTrue(t *testing.T) {
 	spec, err := jobgen.Build(jobgen.Input{URLs: []string{"https://a.test"}, FetchUse: "local", Ladder: true, Provider: "acme", Template: "t"})
 	if err != nil {

@@ -40,6 +40,21 @@ func TestBuildJobSpecLocal(t *testing.T) {
 	}
 }
 
+func TestBuildJobSpecLinksExtract(t *testing.T) {
+	s := newFormState()
+	s.url = "https://example.com"
+	s.localConfigured = true
+	s.extract = "links"
+
+	spec, err := buildJobSpec(s, "")
+	if err != nil {
+		t.Fatalf("buildJobSpec: %v", err)
+	}
+	if len(spec.Stages) != 1 || spec.Stages[0].Use != "links" {
+		t.Errorf("Stages = %v, want one links stage", spec.Stages)
+	}
+}
+
 func TestBuildJobSpecProxy(t *testing.T) {
 	s := newFormState()
 	s.url = "https://example.com"

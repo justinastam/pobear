@@ -20,7 +20,7 @@ type fakeExtractor struct {
 	calls   int
 }
 
-func (f *fakeExtractor) Run(_ context.Context, _ []byte, cfg jobspec.Stage) ([]extractors.Result, error) {
+func (f *fakeExtractor) Run(_ context.Context, _ []byte, _ string, cfg jobspec.Stage) ([]extractors.Result, error) {
 	f.gotCfgs = append(f.gotCfgs, cfg)
 	f.calls++
 	if f.order != nil {
@@ -36,7 +36,7 @@ func TestStagerRunsEachConfiguredStageInOrder(t *testing.T) {
 
 	s := stage.NewStager(map[string]stage.Extractor{"raw": raw, "markdown": md})
 	cfgs := []jobspec.Stage{{Use: "raw"}, {Use: "markdown"}}
-	data, err := s.Run(context.Background(), []byte("body"), cfgs)
+	data, err := s.Run(context.Background(), []byte("body"), "https://a.test/", cfgs)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -60,7 +60,7 @@ func TestStagerMergesMultipleResultsFromOneStage(t *testing.T) {
 	}}
 
 	s := stage.NewStager(map[string]stage.Extractor{"css": css})
-	data, err := s.Run(context.Background(), []byte("<h1>Hello</h1>"), []jobspec.Stage{{Use: "css"}})
+	data, err := s.Run(context.Background(), []byte("<h1>Hello</h1>"), "https://a.test/", []jobspec.Stage{{Use: "css"}})
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -72,7 +72,7 @@ func TestStagerMergesMultipleResultsFromOneStage(t *testing.T) {
 
 func TestStagerNoConfiguredStages(t *testing.T) {
 	s := stage.NewStager(map[string]stage.Extractor{})
-	data, err := s.Run(context.Background(), []byte("body"), nil)
+	data, err := s.Run(context.Background(), []byte("body"), "https://a.test/", nil)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -90,7 +90,7 @@ func TestStagerPassesEachStageItsOwnConfig(t *testing.T) {
 		{Use: "css", Fields: map[string]string{"title": "h1"}},
 		{Use: "css", Fields: map[string]string{"price": ".price"}},
 	}
-	_, err := s.Run(context.Background(), []byte("<h1>Hello</h1>"), cfgs)
+	_, err := s.Run(context.Background(), []byte("<h1>Hello</h1>"), "https://a.test/", cfgs)
 
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -110,7 +110,7 @@ func TestStagerUnknownStageName(t *testing.T) {
 	raw := &fakeExtractor{results: []extractors.Result{{Key: "raw", Value: "body"}}}
 	s := stage.NewStager(map[string]stage.Extractor{"raw": raw})
 	cfgs := []jobspec.Stage{{Use: "raw"}, {Use: "missing"}, {Use: "raw"}}
-	_, err := s.Run(context.Background(), []byte("body"), cfgs)
+	_, err := s.Run(context.Background(), []byte("body"), "https://a.test/", cfgs)
 
 	if !errors.Is(err, stage.ErrUnknownExtractor) {
 		t.Fatalf("expected ErrUnknownExtractor, got %v", err)
@@ -127,7 +127,7 @@ func TestStagerStopsAtFirstStageError(t *testing.T) {
 
 	s := stage.NewStager(map[string]stage.Extractor{"raw": raw, "markdown": md})
 	cfgs := []jobspec.Stage{{Use: "raw"}, {Use: "markdown"}}
-	_, err := s.Run(context.Background(), []byte("body"), cfgs)
+	_, err := s.Run(context.Background(), []byte("body"), "https://a.test/", cfgs)
 
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected the first stage's error, got %v", err)

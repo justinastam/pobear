@@ -1,0 +1,8 @@
+args: scrape {{base}}/shop/index.html --extract links
+stdout: |
+    {"url":"{{base}}/shop/index.html","finalUrl":"{{base}}/shop/index.html","parentUrl":"","status":200,"body":"<a href=/shop/a.html>A</a><a href=b.html>B</a><a href=a.html>A again</a><a href=mailto:x@a.test>mail</a>","depth":0,"data":{"links":["{{base}}/shop/a.html","{{base}}/shop/b.html"]},"tier":"local"}
+stderr: |
+    fetched 1, errors 0, skipped 0
+exit: 0
+fixtures:
+    shop/index.html: <a href=/shop/a.html>A</a><a href=b.html>B</a><a href=a.html>A again</a><a href=mailto:x@a.test>mail</a>

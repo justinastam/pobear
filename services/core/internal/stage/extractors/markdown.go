@@ -10,7 +10,7 @@ import (
 
 type Markdown struct{}
 
-func (Markdown) Run(ctx context.Context, body []byte, cfg jobspec.Stage) ([]Result, error) {
+func (Markdown) Run(ctx context.Context, body []byte, pageURL string, cfg jobspec.Stage) ([]Result, error) {
 	out, err := md.ConvertString(string(body))
 	if err != nil {
 		return nil, err

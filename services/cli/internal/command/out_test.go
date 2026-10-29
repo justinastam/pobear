@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Decodo/pobear/pkg/jobspec"
 )
 
 func TestIsDirOut(t *testing.T) {
@@ -37,11 +39,11 @@ func TestIsDirOut(t *testing.T) {
 }
 
 func TestExtractRawValue(t *testing.T) {
-	if _, err := extractRawValue(map[string]any{}, "title"); err == nil {
+	if _, err := extractRawValue(map[string]any{}, "title", false); err == nil {
 		t.Fatal("expected an error when the field was never produced")
 	}
 
-	got, err := extractRawValue(map[string]any{"title": []any{"only one"}}, "title")
+	got, err := extractRawValue(map[string]any{"title": []any{"only one"}}, "title", false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -49,19 +51,51 @@ func TestExtractRawValue(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, "only one")
 	}
 
-	if _, err := extractRawValue(map[string]any{"title": []any{}}, "title"); err == nil {
+	if _, err := extractRawValue(map[string]any{"title": []any{}}, "title", false); err == nil {
 		t.Fatal("expected an error for zero matches (ambiguous)")
 	}
-	if _, err := extractRawValue(map[string]any{"title": []any{"a", "b"}}, "title"); err == nil {
+	if _, err := extractRawValue(map[string]any{"title": []any{"a", "b"}}, "title", false); err == nil {
 		t.Fatal("expected an error for 2+ matches (ambiguous)")
 	}
 
-	got, err = extractRawValue(map[string]any{"raw": "plain string"}, "raw")
+	got, err = extractRawValue(map[string]any{"raw": "plain string"}, "raw", false)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if got != "plain string" {
 		t.Fatalf("got %q, want %q", got, "plain string")
+	}
+}
+
+func TestExtractRawValueAsLines(t *testing.T) {
+	got, err := extractRawValue(map[string]any{"links": []any{"https://a.test/1", "https://a.test/2"}}, "links", true)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if want := "https://a.test/1\nhttps://a.test/2\n"; got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+
+	got, err = extractRawValue(map[string]any{"links": []any{}}, "links", true)
+	if err != nil {
+		t.Fatalf("expected no error for an empty list in line mode, got %v", err)
+	}
+	if got != "" {
+		t.Fatalf("got %q, want empty output for an empty list", got)
+	}
+}
+
+func TestBareListField(t *testing.T) {
+	links := &jobspec.Spec{Stages: []jobspec.Stage{{Use: "links"}}}
+	if !bareListField(links, "links") {
+		t.Error("bareListField(links stage, \"links\") = false, want true")
+	}
+	if bareListField(links, "title") {
+		t.Error("bareListField(links stage, \"title\") = true, want false")
+	}
+	css := &jobspec.Spec{Stages: []jobspec.Stage{{Use: "css", Fields: map[string]string{"links": "a@href"}}}}
+	if bareListField(css, "links") {
+		t.Error("bareListField(css field named links, \"links\") = true, want false -- only a links stage prints one value per line")
 	}
 }
 
@@ -88,7 +122,7 @@ func TestWriteDirOutputsJSONFormat(t *testing.T) {
 	}
 	outDir := t.TempDir()
 
-	entries, err := writeDirOutputs(tmpPath, outDir, false, "", nil, nil)
+	entries, err := writeDirOutputs(tmpPath, outDir, false, "", false, nil, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -122,7 +156,7 @@ func TestWriteDirOutputsRawFormatPerItemFailureDoesNotAbortOthers(t *testing.T) 
 	}
 	outDir := t.TempDir()
 
-	entries, err := writeDirOutputs(tmpPath, outDir, true, "title", nil, nil)
+	entries, err := writeDirOutputs(tmpPath, outDir, true, "title", false, nil, nil)
 	if err != nil {
 		t.Fatalf("expected writeDirOutputs itself to succeed even though one item's extraction failed, got %v", err)
 	}
@@ -166,7 +200,7 @@ func TestWriteDirOutputsBareWithNoFieldUsesBody(t *testing.T) {
 	}
 	outDir := t.TempDir()
 
-	entries, err := writeDirOutputs(tmpPath, outDir, true, "", nil, nil)
+	entries, err := writeDirOutputs(tmpPath, outDir, true, "", false, nil, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -196,7 +230,7 @@ func TestWriteDirOutputsIncludesFailureLines(t *testing.T) {
 	outDir := t.TempDir()
 
 	failureLine := `https://b.test [http]: tiers: http status 404`
-	entries, err := writeDirOutputs(tmpPath, outDir, false, "", []string{failureLine}, nil)
+	entries, err := writeDirOutputs(tmpPath, outDir, false, "", false, []string{failureLine}, nil)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -219,7 +253,7 @@ func TestWriteDirOutputsIncludesSkippedLines(t *testing.T) {
 	outDir := t.TempDir()
 
 	skippedLine := `https://b.test: disallowed by robots.txt`
-	entries, err := writeDirOutputs(tmpPath, outDir, false, "", nil, []string{skippedLine})
+	entries, err := writeDirOutputs(tmpPath, outDir, false, "", false, nil, []string{skippedLine})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}

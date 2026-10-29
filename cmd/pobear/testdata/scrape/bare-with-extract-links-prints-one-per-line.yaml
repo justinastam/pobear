@@ -1,0 +1,9 @@
+args: scrape {{base}}/shop/index.html --extract links --bare
+stdout: |
+    {{base}}/shop/a.html
+    {{base}}/shop/b.html
+stderr: |
+    fetched 1, errors 0, skipped 0
+exit: 0
+fixtures:
+    shop/index.html: <a href=/shop/a.html>A</a><a href=b.html>B</a><a href=a.html>A again</a><a href=mailto:x@a.test>mail</a>

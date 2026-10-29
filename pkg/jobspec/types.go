@@ -49,9 +49,11 @@ type Limits struct {
 }
 
 type Stage struct {
-	Use    string            `yaml:"use" json:"use"`
-	Fields map[string]string `yaml:"fields,omitempty" json:"fields,omitempty"`
-	ID     string            `yaml:"id,omitempty" json:"id,omitempty"`
+	Use     string            `yaml:"use" json:"use"`
+	Fields  map[string]string `yaml:"fields,omitempty" json:"fields,omitempty"`
+	Include []string          `yaml:"include,omitempty" json:"include,omitempty"`
+	Exclude []string          `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+	ID      string            `yaml:"id,omitempty" json:"id,omitempty"`
 }
 
 type Sink struct {

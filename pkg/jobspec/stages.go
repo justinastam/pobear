@@ -20,14 +20,14 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 	stages := make([]Stage, 0, len(list))
 	for i, item := range list {
 		field := fmt.Sprintf("stages[%d]", i)
-		m, err := utils.AsMapping(item, field, "use", "fields", "id")
+		m, err := utils.AsMapping(item, field, "use", "fields", "id", "include", "exclude")
 		if err != nil {
 			return nil, err
 		}
 
 		use, _ := m["use"].(string)
 		switch use {
-		case "raw", "markdown":
+		case "raw", "markdown", "links":
 		case "css":
 			if _, ok := m["fields"]; !ok {
 				return nil, utils.Errorf(field+".fields", "`%s.fields` is required for a `css` stage", field)
@@ -37,7 +37,13 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 				return nil, utils.Errorf(field+".use", "`%s.use: plugin` is only allowed under `__rpc` mode", field)
 			}
 		default:
-			return nil, utils.Errorf(field+".use", "`%s.use` must be one of `raw`, `markdown`, `css`, `plugin`, got %q", field, use)
+			return nil, utils.Errorf(field+".use", "`%s.use` must be one of `raw`, `markdown`, `css`, `links`, `plugin`, got %q", field, use)
+		}
+
+		for _, key := range []string{"include", "exclude"} {
+			if _, ok := m[key]; ok && use != "links" {
+				return nil, utils.Errorf(field+"."+key, "`%s.%s` is only valid on a `links` stage", field, key)
+			}
 		}
 
 		stage := Stage{Use: use}
@@ -47,6 +53,17 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 				return nil, err
 			}
 			stage.Fields = fields
+		}
+		if use == "links" {
+			include, err := parseGlobList(m, "include", field+".include")
+			if err != nil {
+				return nil, err
+			}
+			exclude, err := parseGlobList(m, "exclude", field+".exclude")
+			if err != nil {
+				return nil, err
+			}
+			stage.Include, stage.Exclude = include, exclude
 		}
 		if idRaw, ok := m["id"]; ok {
 			stage.ID, _ = idRaw.(string)
@@ -84,6 +101,8 @@ func stageDataKeys(s Stage) []string {
 		return []string{"raw"}
 	case "markdown":
 		return []string{"markdown"}
+	case "links":
+		return []string{"links"}
 	case "css":
 		keys := make([]string, 0, len(s.Fields))
 		for k := range s.Fields {

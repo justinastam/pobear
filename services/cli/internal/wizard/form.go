@@ -104,7 +104,7 @@ func resolveFetchUseAndLadder(c fetchConfig) (use string, ladder bool) {
 }
 
 func extractFields(c extractConfig) []field {
-	extractField := choiceField("extract", "Extract", "(bare / raw / markdown / css fields)", []string{"bare", "raw", "markdown", "css fields"}, c.extract)
+	extractField := choiceField("extract", "Extract", "(bare / raw / markdown / links / css fields)", []string{"bare", "raw", "markdown", "links", "css fields"}, c.extract)
 	if bareEasterEgg && c.extract == "bare" {
 		extractField.displayOverride = "bear"
 	}

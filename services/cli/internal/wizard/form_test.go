@@ -181,14 +181,14 @@ func TestComputeFieldsProfileIsAChoiceOfThree(t *testing.T) {
 	}
 }
 
-func TestComputeFieldsExtractIsAChoiceOfFourIncludingBare(t *testing.T) {
+func TestComputeFieldsExtractIsAChoiceOfFiveIncludingBare(t *testing.T) {
 	s := newFormState()
 	fields := computeFields(s)
 	extract, ok := findField(fields, "extract")
 	if !ok {
 		t.Fatal("expected an \"extract\" field")
 	}
-	want := []string{"bare", "raw", "markdown", "css fields"}
+	want := []string{"bare", "raw", "markdown", "links", "css fields"}
 	if len(extract.options) != len(want) {
 		t.Fatalf("extract options = %v, want %v", extract.options, want)
 	}
