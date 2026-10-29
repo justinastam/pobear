@@ -1,0 +1,10 @@
+args: scrape {{base}}/books/page-1.html --follow a.next --css title=h3
+stdout: |
+    {"url":"{{base}}/books/page-1.html","finalUrl":"{{base}}/books/page-1.html","parentUrl":"","status":200,"body":"<h3>Book A</h3><a class=\"next\" href=\"page-2.html\">next</a>","depth":0,"data":{"title":["Book A"]},"tier":"local"}
+    {"url":"{{base}}/books/page-2.html","finalUrl":"{{base}}/books/page-2.html","parentUrl":"{{base}}/books/page-1.html","status":200,"body":"<h3>Book B</h3><a class=\"next\" href=\"page-1.html#top\">back to start</a>","depth":1,"data":{"title":["Book B"]},"tier":"local"}
+stderr: |
+    fetched 2, errors 0, skipped 0
+exit: 0
+fixtures:
+    books/page-1.html: <h3>Book A</h3><a class="next" href="page-2.html">next</a>
+    books/page-2.html: <h3>Book B</h3><a class="next" href="page-1.html#top">back to start</a>

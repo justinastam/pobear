@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test], follow: {selector: "a.next", maxPages: 0}}
+  fetch: {use: local}
+wantErr: true
+wantField: source.follow.maxPages
+wantMessage: "`source.follow.maxPages` must be > 0, got 0"

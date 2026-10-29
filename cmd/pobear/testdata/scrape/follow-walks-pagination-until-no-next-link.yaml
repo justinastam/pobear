@@ -1,0 +1,12 @@
+args: scrape {{base}}/books/page-1.html --follow li.next>a@href --css title=h3
+stdout: |
+    {"url":"{{base}}/books/page-1.html","finalUrl":"{{base}}/books/page-1.html","parentUrl":"","status":200,"body":"<h3>Book A</h3><ul><li class=\"next\"><a href=\"page-2.html\">next</a></li></ul>","depth":0,"data":{"title":["Book A"]},"tier":"local"}
+    {"url":"{{base}}/books/page-2.html","finalUrl":"{{base}}/books/page-2.html","parentUrl":"{{base}}/books/page-1.html","status":200,"body":"<h3>Book B</h3><ul><li class=\"next\"><a href=\"page-3.html\">next</a></li></ul>","depth":1,"data":{"title":["Book B"]},"tier":"local"}
+    {"url":"{{base}}/books/page-3.html","finalUrl":"{{base}}/books/page-3.html","parentUrl":"{{base}}/books/page-2.html","status":200,"body":"<h3>Book C</h3>","depth":2,"data":{"title":["Book C"]},"tier":"local"}
+stderr: |
+    fetched 3, errors 0, skipped 0
+exit: 0
+fixtures:
+    books/page-1.html: <h3>Book A</h3><ul><li class="next"><a href="page-2.html">next</a></li></ul>
+    books/page-2.html: <h3>Book B</h3><ul><li class="next"><a href="page-3.html">next</a></li></ul>
+    books/page-3.html: <h3>Book C</h3>

@@ -1,0 +1,19 @@
+args: scrape {{base}}/x --follow a.next@href --max-pages 20 --print-spec
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/x"
+        ],
+        "follow": {
+          "selector": "a.next@href",
+          "maxPages": 20
+        }
+      },
+      "fetch": {
+        "use": "local"
+      }
+    }
+stderr: ""
+exit: 0

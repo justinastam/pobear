@@ -1,0 +1,5 @@
+args: scrape {{base}}/x --max-pages 5
+stdout: ""
+stderr: |
+    pobear: --max-pages requires --follow
+exit: 3

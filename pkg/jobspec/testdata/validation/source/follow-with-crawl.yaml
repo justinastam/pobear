@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {crawl: {seeds: [https://a.test]}, follow: {selector: "a.next"}}
+  fetch: {use: local}
+wantErr: true
+wantField: source.follow
+wantMessage: "`source.follow` is only valid alongside `source.urls`, not `source.crawl` -- a crawl already follows links"

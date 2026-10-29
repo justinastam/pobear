@@ -1,6 +1,9 @@
 package jobspec
 
 import (
+	"strings"
+
+	"github.com/andybalholm/cascadia"
 	"github.com/bmatcuk/doublestar/v4"
 
 	"github.com/Decodo/pobear/pkg/utils"
@@ -11,24 +14,34 @@ func parseSource(root map[string]any) (Source, *ValidationError) {
 	if !ok {
 		return Source{}, utils.Errorf("source", "`source` is required")
 	}
-	m, err := utils.AsMapping(raw, "source", "urls", "crawl")
+	m, err := utils.AsMapping(raw, "source", "urls", "crawl", "follow")
 	if err != nil {
 		return Source{}, err
 	}
 
 	_, hasURLs := m["urls"]
 	_, hasCrawl := m["crawl"]
+	_, hasFollow := m["follow"]
 	switch {
 	case hasURLs && hasCrawl:
 		return Source{}, utils.Errorf("source", "`source` must set exactly one of `urls` or `crawl`, but both are set")
 	case !hasURLs && !hasCrawl:
 		return Source{}, utils.Errorf("source", "`source` must set exactly one of `urls` or `crawl`, but neither is set")
+	case hasFollow && hasCrawl:
+		return Source{}, utils.Errorf("source.follow", "`source.follow` is only valid alongside `source.urls`, not `source.crawl` -- a crawl already follows links")
 	case hasURLs:
 		urls, err := parseURLList(m["urls"], "source.urls")
 		if err != nil {
 			return Source{}, err
 		}
-		return Source{URLs: urls}, nil
+		var follow *FollowSource
+		if hasFollow {
+			follow, err = parseFollowSource(m["follow"])
+			if err != nil {
+				return Source{}, err
+			}
+		}
+		return Source{URLs: urls, Follow: follow}, nil
 	default:
 		crawl, err := parseCrawlSource(m["crawl"])
 		if err != nil {
@@ -105,6 +118,32 @@ func parseCrawlSource(raw any) (*CrawlSource, *ValidationError) {
 		Sitemap:     sitemap,
 		Robots:      robots,
 	}, nil
+}
+
+func parseFollowSource(raw any) (*FollowSource, *ValidationError) {
+	m, err := utils.AsMapping(raw, "source.follow", "selector", "maxPages")
+	if err != nil {
+		return nil, err
+	}
+
+	selector, _ := m["selector"].(string)
+	if selector == "" {
+		return nil, utils.Errorf("source.follow.selector", "`source.follow.selector` is required and must be a non-empty `selector[@attr]` string")
+	}
+	cssSelector, _, _ := strings.Cut(selector, "@")
+	if _, cerr := cascadia.Compile(cssSelector); cerr != nil {
+		return nil, utils.Errorf("source.follow.selector", "`source.follow.selector` is not a valid CSS selector: %q", cssSelector)
+	}
+
+	maxPages, err := utils.GetInt(m, "maxPages", "source.follow.maxPages", 100)
+	if err != nil {
+		return nil, err
+	}
+	if maxPages <= 0 {
+		return nil, utils.Errorf("source.follow.maxPages", "`source.follow.maxPages` must be > 0, got %d", maxPages)
+	}
+
+	return &FollowSource{Selector: selector, MaxPages: maxPages}, nil
 }
 
 func parseURLList(raw any, field string) ([]string, *ValidationError) {

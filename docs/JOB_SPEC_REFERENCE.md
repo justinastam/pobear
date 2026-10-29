@@ -18,6 +18,7 @@ version: 1
 
 source:
   urls: [https://a.test]         # exactly one of urls / crawl
+  follow: { selector: "a.next" } # optional, only alongside urls
   crawl: { seeds: [https://a.test] }
 
 fetch:
@@ -57,7 +58,8 @@ a validation error (§8), not a silently-ignored typo.
 ## 3. `source`
 
 **Rule:** exactly one of `urls` or `crawl` must be set. Both set, or neither set, is
-rejected at validation time.
+rejected at validation time. `follow` (§3.3) is an optional modifier of `urls`;
+setting it alongside `crawl` is rejected — a crawl already follows links.
 
 ### 3.1 `source.urls`
 
@@ -127,6 +129,45 @@ under that origin is treated as disallowed for the rest of the crawl, not
 allowed through. `sitemap.xml` follows one level of `<sitemapindex>` recursion
 (an index pointing to per-section sitemaps); gzip-compressed sitemaps aren't
 supported.
+
+### 3.3 `source.follow`
+
+Pagination: turns each `source.urls` entry into the start of a chain, following
+one "next page" link per page instead of every link like a crawl does.
+
+| Field | Type | Default | Rule |
+|---|---|---|---|
+| `selector` | string | — (required) | `selector[@attr]`, the same syntax as a `css` stage field (§6); `@attr` defaults to `href`; the selector part must be valid CSS |
+| `maxPages` | `int` | `100` | must be `> 0`; a cap **per chain**, counting the starting URL itself |
+
+Each page is fetched, staged and emitted exactly like a plain `urls` entry, then
+the next-page link is the first element matching `selector` whose `attr` value
+resolves — against the page's own final URL, the same way crawl link discovery
+resolves an `href` (§3.2) — to an `http`/`https` URL. Each emitted item's
+`parentUrl` is the page the chain came from (empty for the starting URL) and its
+`depth` is its position in the chain (`0` for the starting URL).
+
+A chain stops at the first of:
+
+- **No next link** — nothing matches `selector`, or no match resolves to an
+  `http`/`https` URL.
+- **Already-seen URL** — the next link was already fetched or queued by this
+  job, in this chain or another one. Uses the same run-scoped dedupe set and
+  "same URL" rule as a crawl (§3.2: fragment dropped, query canonicalized); like
+  a crawl's duplicate discard, it ends the chain silently, not as `skipped`.
+  Starting URLs are claimed against the same set up front, so a starting URL
+  listed twice is fetched once, and a chain that reaches another starting URL
+  stops there — that page belongs to its own chain.
+- **`maxPages`** — the chain has fetched `maxPages` pages; the next link it
+  would have followed is reported as `skipped` (`over --max-pages budget`), the
+  same as a crawl's budget skip.
+- **A failed fetch or stage** — reported as a failure like any other item; with
+  no page to read, there is no next link to follow.
+
+Pages within one chain are fetched one at a time (each depends on the previous
+page's body); separate chains run concurrently, bounded by `limits.concurrency`
+like any `urls` list. `scope`, `include`/`exclude` and `robots` (§3.2) are
+crawl-only and don't apply — `follow` goes wherever the selector points.
 
 ---
 
@@ -305,6 +346,8 @@ a crawl:
 - `version` missing or not `1`.
 - `source`: neither or both of `urls`/`crawl` set; empty `urls`/`seeds`; a
   non-absolute or non-`http(s)` URL anywhere in either.
+- `source.follow`: set alongside `crawl`; `selector` missing, empty or not valid
+  CSS; `maxPages` `<= 0`.
 - `source.crawl`: negative `depth`/`maxPages`; `maxDuration` not a valid duration;
   `scope`/`robots` outside their enums; malformed `include`/`exclude` globs.
 - `fetch`: a field set for a tier that doesn't support it (§4); `profile`/`use`
@@ -358,6 +401,17 @@ those defaults instead of omitting them.
 ---
 
 ## 11. Full annotated spec
+
+A crawl source is shown below; a pagination source swaps it for
+`urls` + `follow`:
+
+```yaml
+source:
+  urls: [https://a.test/list]
+  follow:
+    selector: "li.next a@href"
+    maxPages: 20
+```
 
 ```yaml
 version: 1

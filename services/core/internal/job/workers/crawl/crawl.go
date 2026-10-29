@@ -53,7 +53,7 @@ type frontierEntry struct {
 func (c *Crawl) Run(ctx context.Context, spec *jobspec.Spec) (Result, error) {
 	cs := spec.Source.Crawl
 	deadline := crawlDeadline(cs)
-	dd := newDedupe()
+	dd := workers.NewDedupe()
 
 	p := pool.New(spec.Limits.Concurrency)
 	var mu sync.Mutex
@@ -139,7 +139,7 @@ func (c *Crawl) Run(ctx context.Context, spec *jobspec.Spec) (Result, error) {
 			return
 		}
 		for _, link := range links {
-			if !dd.claim(link) {
+			if !dd.Claim(link) {
 				continue
 			}
 			child := frontierEntry{url: link, parentURL: entry.url, depth: entry.depth + 1, origin: entry.origin}
@@ -166,9 +166,9 @@ func crawlDeadline(cs *jobspec.CrawlSource) time.Time {
 	return time.Now().Add(d)
 }
 
-func (c *Crawl) seedFrontier(ctx context.Context, cs *jobspec.CrawlSource, dd *dedupe, dispatch func(frontierEntry)) {
+func (c *Crawl) seedFrontier(ctx context.Context, cs *jobspec.CrawlSource, dd *workers.Dedupe, dispatch func(frontierEntry)) {
 	for _, seed := range cs.Seeds {
-		if !dd.claim(seed) {
+		if !dd.Claim(seed) {
 			continue
 		}
 		origin := hostOf(seed)
@@ -177,7 +177,7 @@ func (c *Crawl) seedFrontier(ctx context.Context, cs *jobspec.CrawlSource, dd *d
 			urls, err := c.sitemap.URLs(ctx, seed)
 			if err == nil {
 				for _, u := range urls {
-					if !dd.claim(u) {
+					if !dd.Claim(u) {
 						continue
 					}
 					dispatch(frontierEntry{url: u, depth: 0, origin: origin})

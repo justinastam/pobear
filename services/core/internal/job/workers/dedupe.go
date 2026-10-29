@@ -1,4 +1,4 @@
-package crawl
+package workers
 
 import (
 	"net/url"
@@ -6,16 +6,16 @@ import (
 	"sync"
 )
 
-type dedupe struct {
+type Dedupe struct {
 	mu   sync.Mutex
 	seen map[string]struct{}
 }
 
-func newDedupe() *dedupe {
-	return &dedupe{seen: make(map[string]struct{})}
+func NewDedupe() *Dedupe {
+	return &Dedupe{seen: make(map[string]struct{})}
 }
 
-func (d *dedupe) claim(rawURL string) bool {
+func (d *Dedupe) Claim(rawURL string) bool {
 	key := dedupeKey(rawURL)
 
 	d.mu.Lock()
@@ -25,6 +25,15 @@ func (d *dedupe) claim(rawURL string) bool {
 	}
 	d.seen[key] = struct{}{}
 	return true
+}
+
+func (d *Dedupe) Seen(rawURL string) bool {
+	key := dedupeKey(rawURL)
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	_, ok := d.seen[key]
+	return ok
 }
 
 func dedupeKey(rawURL string) string {

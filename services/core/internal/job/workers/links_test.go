@@ -76,3 +76,44 @@ func TestHTMLLinksReturnsNilWhenNoLinksPresent(t *testing.T) {
 		t.Fatalf("got %v, want nil", got)
 	}
 }
+
+func TestFollowLinkResolvesTheFirstMatchAgainstBaseURL(t *testing.T) {
+	body := []byte(`<li class="next"><a href="page-2.html">next</a></li><li class="next"><a href="page-9.html">next</a></li>`)
+
+	got, ok := workers.FollowLink(body, "https://a.test/list/page-1.html", "li.next a@href")
+
+	if !ok || got != "https://a.test/list/page-2.html" {
+		t.Fatalf("got %q (ok=%v), want https://a.test/list/page-2.html", got, ok)
+	}
+}
+
+func TestFollowLinkDefaultsTheAttributeToHref(t *testing.T) {
+	body := []byte(`<a rel="next" href="?page=2">next</a>`)
+
+	got, ok := workers.FollowLink(body, "https://a.test/list?page=1", `a[rel=next]`)
+
+	if !ok || got != "https://a.test/list?page=2" {
+		t.Fatalf("got %q (ok=%v), want https://a.test/list?page=2", got, ok)
+	}
+}
+
+func TestFollowLinkReadsANamedAttribute(t *testing.T) {
+	body := []byte(`<button class="more" data-url="/list/3">more</button>`)
+
+	got, ok := workers.FollowLink(body, "https://a.test/list/2", "button.more@data-url")
+
+	if !ok || got != "https://a.test/list/3" {
+		t.Fatalf("got %q (ok=%v), want https://a.test/list/3", got, ok)
+	}
+}
+
+func TestFollowLinkSkipsNonHTTPMatchesAndReportsNoneWhenNothingUsable(t *testing.T) {
+	body := []byte(`<a class="next" href="javascript:void(0)">next</a>`)
+
+	if got, ok := workers.FollowLink(body, "https://a.test/", "a.next"); ok {
+		t.Fatalf("got %q, want no next link (javascript: isn't followable)", got)
+	}
+	if got, ok := workers.FollowLink([]byte(`<p>last page</p>`), "https://a.test/", "a.next"); ok {
+		t.Fatalf("got %q, want no next link on a page with no match", got)
+	}
+}

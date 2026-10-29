@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test], follow: {maxPages: 5}}
+  fetch: {use: local}
+wantErr: true
+wantField: source.follow.selector
+wantMessage: "`source.follow.selector` is required and must be a non-empty `selector[@attr]` string"

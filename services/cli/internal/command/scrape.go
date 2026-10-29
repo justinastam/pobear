@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Decodo/pobear/pkg/exitcode"
 	"github.com/Decodo/pobear/pkg/fault"
 	"github.com/Decodo/pobear/pkg/jobresult"
 	"github.com/Decodo/pobear/pkg/jobspec"
@@ -38,6 +39,8 @@ type Scrape struct {
 
 func (s *Scrape) Run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	var f commonFlags
+	var follow string
+	var maxPages int
 	code := 0
 
 	cmd := &cobra.Command{
@@ -46,10 +49,17 @@ func (s *Scrape) Run(ctx context.Context, args []string, stdin io.Reader, stdout
 		Long: "Scrape a single URL, or every URL listed in a file.\n\n" +
 			"The positional argument is either a single absolute http/https URL, or a\n" +
 			"path to a file listing many: plain text, one URL per line, blank lines and\n" +
-			"lines starting with # skipped.",
+			"lines starting with # skipped.\n\n" +
+			"--follow turns each URL into the start of a pagination chain: every page's\n" +
+			"next-page link (the first match of the selector) is fetched in turn, until\n" +
+			"there's no next link, the link was already fetched, or --max-pages is hit.",
 		Args: requireExactlyOne("scrape requires a URL or file argument"),
-		RunE: func(_ *cobra.Command, cmdArgs []string) error {
-			c, cerr := scrapeRun(ctx, s.Runner, s.Providers, s.CredentialsPath, cmdArgs[0], &f, stdout, stderr)
+		RunE: func(cobraCmd *cobra.Command, cmdArgs []string) error {
+			followIn, ferr := resolveFollow(follow, maxPages, cobraCmd.Flags().Changed("max-pages"))
+			if ferr != nil {
+				return ferr
+			}
+			c, cerr := scrapeRun(ctx, s.Runner, s.Providers, s.CredentialsPath, cmdArgs[0], &f, followIn, stdout, stderr)
 			code = c
 			if cerr != nil {
 				return cerr
@@ -58,12 +68,25 @@ func (s *Scrape) Run(ctx context.Context, args []string, stdin io.Reader, stdout
 		},
 	}
 	registerCommonFlags(cmd, &f, 0)
+	flags := cmd.Flags()
+	flags.StringVar(&follow, "follow", "", "follow a next-page link chain from each URL, as selector[@attr] (attr defaults to href)")
+	flags.IntVar(&maxPages, "max-pages", 100, "with --follow: stop each chain after fetching this many pages")
 	wireProviderHelp(cmd, s.Providers, &f.provider)
 
 	return runCobraCommand(cmd, args, stdin, stdout, stderr, &code)
 }
 
-func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Providerator, credentialsPath, target string, f *commonFlags, stdout, stderr io.Writer) (int, *cliError) {
+func resolveFollow(selector string, maxPages int, maxPagesSet bool) (*jobgen.FollowInput, *cliError) {
+	if selector == "" {
+		if maxPagesSet {
+			return nil, newCLIError(exitcode.UsageError, "--max-pages requires --follow")
+		}
+		return nil, nil
+	}
+	return &jobgen.FollowInput{Selector: selector, MaxPages: &maxPages}, nil
+}
+
+func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Providerator, credentialsPath, target string, f *commonFlags, followIn *jobgen.FollowInput, stdout, stderr io.Writer) (int, *cliError) {
 	urls, cerr := resolveScrapeURLs(target)
 	if cerr != nil {
 		return 0, cerr
@@ -79,6 +102,9 @@ func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Pr
 		return 0, cerr
 	}
 	if cerr := validateBareSingleTarget(f.bare, isDirOut(f.out), len(urls)); cerr != nil {
+		return 0, cerr
+	}
+	if cerr := validateBareFollow(f.bare, isDirOut(f.out), followIn); cerr != nil {
 		return 0, cerr
 	}
 
@@ -115,11 +141,14 @@ func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Pr
 	}
 
 	resolvedIn := jobgen.Input{
-		URLs: urls, FetchUse: fetchUse, Ladder: f.ladder, Proxy: f.proxy, Provider: f.provider, Template: f.template,
+		URLs: urls, Follow: followIn, FetchUse: fetchUse, Ladder: f.ladder, Proxy: f.proxy, Provider: f.provider, Template: f.template,
 		Profile: profile, Options: fetchOptions, Timeout: f.timeout, Headers: headers, Stages: stages,
 		Concurrency: &f.concurrency, RPS: &f.rps, Retries: &f.retries, SinkUse: sinkUse, SinkPath: sinkPath,
 	}
 	defaultsIn := jobgen.Input{URLs: urls, FetchUse: "local"}
+	if followIn != nil {
+		defaultsIn.Follow = &jobgen.FollowInput{Selector: followIn.Selector}
+	}
 
 	rawField := ""
 	if len(names) == 1 {

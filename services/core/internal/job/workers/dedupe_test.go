@@ -1,13 +1,15 @@
-package crawl
+package workers_test
 
 import (
 	"fmt"
 	"sync"
 	"testing"
+
+	"github.com/Decodo/pobear/services/core/internal/job/workers"
 )
 
 func TestDedupeClaimIsSafeForConcurrentCallers(t *testing.T) {
-	d := newDedupe()
+	d := workers.NewDedupe()
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -17,7 +19,7 @@ func TestDedupeClaimIsSafeForConcurrentCallers(t *testing.T) {
 		wg.Add(2)
 		claim := func() {
 			defer wg.Done()
-			if d.claim(fmt.Sprintf("https://a.test/%d", i)) {
+			if d.Claim(fmt.Sprintf("https://a.test/%d", i)) {
 				mu.Lock()
 				claimed++
 				mu.Unlock()

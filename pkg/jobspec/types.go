@@ -10,8 +10,14 @@ type Spec struct {
 }
 
 type Source struct {
-	URLs  []string     `yaml:"urls,omitempty" json:"urls,omitempty"`
-	Crawl *CrawlSource `yaml:"crawl,omitempty" json:"crawl,omitempty"`
+	URLs   []string      `yaml:"urls,omitempty" json:"urls,omitempty"`
+	Follow *FollowSource `yaml:"follow,omitempty" json:"follow,omitempty"`
+	Crawl  *CrawlSource  `yaml:"crawl,omitempty" json:"crawl,omitempty"`
+}
+
+type FollowSource struct {
+	Selector string `yaml:"selector" json:"selector"`
+	MaxPages int    `yaml:"maxPages" json:"maxPages"`
 }
 
 type CrawlSource struct {

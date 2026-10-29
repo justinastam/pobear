@@ -20,8 +20,14 @@ type CrawlInput struct {
 	Robots      string
 }
 
+type FollowInput struct {
+	Selector string
+	MaxPages *int
+}
+
 type Input struct {
 	URLs        []string
+	Follow      *FollowInput
 	Crawl       *CrawlInput
 	FetchUse    string
 	Ladder      bool
@@ -66,7 +72,15 @@ func Build(in Input) (*jobspec.Spec, error) {
 
 func buildSourceDoc(in Input) map[string]any {
 	if in.Crawl == nil {
-		return map[string]any{"urls": in.URLs}
+		source := map[string]any{"urls": in.URLs}
+		if in.Follow != nil {
+			follow := map[string]any{"selector": in.Follow.Selector}
+			if in.Follow.MaxPages != nil {
+				follow["maxPages"] = *in.Follow.MaxPages
+			}
+			source["follow"] = follow
+		}
+		return source
 	}
 
 	c := in.Crawl
@@ -180,8 +194,14 @@ type minimalSpec struct {
 }
 
 type minimalSource struct {
-	URLs  []string            `json:"urls,omitempty"`
-	Crawl *minimalCrawlSource `json:"crawl,omitempty"`
+	URLs   []string            `json:"urls,omitempty"`
+	Follow *minimalFollow      `json:"follow,omitempty"`
+	Crawl  *minimalCrawlSource `json:"crawl,omitempty"`
+}
+
+type minimalFollow struct {
+	Selector string `json:"selector"`
+	MaxPages *int   `json:"maxPages,omitempty"`
 }
 
 type minimalCrawlSource struct {
@@ -241,7 +261,17 @@ func minimalSourceFrom(r, d jobspec.Source) minimalSource {
 	if r.Crawl != nil {
 		return minimalSource{Crawl: minimalCrawlFrom(r.Crawl, d.Crawl)}
 	}
-	return minimalSource{URLs: r.URLs}
+	return minimalSource{URLs: r.URLs, Follow: minimalFollowFrom(r.Follow, d.Follow)}
+}
+
+func minimalFollowFrom(r, d *jobspec.FollowSource) *minimalFollow {
+	if r == nil {
+		return nil
+	}
+	if d == nil {
+		d = &jobspec.FollowSource{}
+	}
+	return &minimalFollow{Selector: r.Selector, MaxPages: diffInt(r.MaxPages, d.MaxPages)}
 }
 
 func minimalCrawlFrom(r, d *jobspec.CrawlSource) *minimalCrawlSource {

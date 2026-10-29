@@ -78,6 +78,17 @@ pobear scrape urls.txt --extract markdown --out pages.ndjson
 
 This is useful when another step in your workflow already produces the URLs. Blank lines and lines beginning with `#` are ignored.
 
+### Scrape every page of a listing
+
+Follow a "next page" link instead of crawling the whole site:
+
+```sh
+pobear scrape https://books.toscrape.com/catalogue/category/books/mystery_3/index.html \
+  --follow 'li.next a@href' --max-pages 20 --css 'title=h3 a@title'
+```
+
+Each page in the chain is its own record. The chain stops when a page has no next link, the link points back to a page already fetched, or `--max-pages` is reached.
+
 ### Save a reusable scraping job
 
 Print a job spec instead of executing the command:
