@@ -13,7 +13,7 @@ import (
 
 type CSS struct{}
 
-func (CSS) Run(ctx context.Context, body []byte, cfg jobspec.Stage) ([]Result, error) {
+func (CSS) Run(ctx context.Context, body []byte, pageURL string, cfg jobspec.Stage) ([]Result, error) {
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, err

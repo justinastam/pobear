@@ -78,6 +78,15 @@ pobear scrape urls.txt --extract markdown --out pages.ndjson
 
 This is useful when another step in your workflow already produces the URLs. Blank lines and lines beginning with `#` are ignored.
 
+pobear can produce that list itself. `--extract links` collects every link on a page as absolute URLs, and with `--bare` it prints one URL per line:
+
+```sh
+pobear scrape https://books.toscrape.com/ --extract links --bare > urls.txt
+pobear scrape urls.txt --css 'title=h1' --out books.ndjson
+```
+
+To keep only some of those links, give the `links` stage `include`/`exclude` globs in a [job spec](docs/JOB_SPEC_REFERENCE.md#6-stages).
+
 ### Save a reusable scraping job
 
 Print a job spec instead of executing the command:

@@ -151,6 +151,12 @@ func buildStagesDoc(stages []jobspec.Stage) []map[string]any {
 		if len(s.Fields) > 0 {
 			doc["fields"] = s.Fields
 		}
+		if len(s.Include) > 0 {
+			doc["include"] = s.Include
+		}
+		if len(s.Exclude) > 0 {
+			doc["exclude"] = s.Exclude
+		}
 		if s.ID != "" {
 			doc["id"] = s.ID
 		}

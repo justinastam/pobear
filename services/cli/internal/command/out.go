@@ -57,7 +57,7 @@ func runJobRaw(ctx context.Context, runner JobRunner, spec *jobspec.Spec, fieldN
 		return code, nil
 	}
 
-	value, err := readRawValue(tmpPath, fieldName)
+	value, err := readRawValue(tmpPath, fieldName, bareListField(spec, fieldName))
 	if err != nil {
 		return 0, newCLIError(exitcode.Fatal, "%v", err)
 	}
@@ -71,7 +71,7 @@ func runJobRaw(ctx context.Context, runner JobRunner, spec *jobspec.Spec, fieldN
 	return code, nil
 }
 
-func readRawValue(path, fieldName string) (string, error) {
+func readRawValue(path, fieldName string, asLines bool) (string, error) {
 	data, err := os.ReadFile(path) //nolint:gosec // path is this command's own os.MkdirTemp file, not user-controlled input
 	if err != nil {
 		return "", err
@@ -87,16 +87,39 @@ func readRawValue(path, fieldName string) (string, error) {
 	if fieldName == "" {
 		return item.Body, nil
 	}
-	return extractRawValue(item.Data, fieldName)
+	return extractRawValue(item.Data, fieldName, asLines)
 }
 
-func extractRawValue(data map[string]any, fieldName string) (string, error) {
+// bareListField reports whether --bare prints fieldName's whole list, one value
+// per line, instead of requiring exactly one element: true only for the data key
+// a `links` stage writes, whose output is meant to be piped straight into a
+// `pobear scrape <file>` URL list.
+func bareListField(spec *jobspec.Spec, fieldName string) bool {
+	if fieldName != "links" {
+		return false
+	}
+	for _, s := range spec.Stages {
+		if s.Use == "links" {
+			return true
+		}
+	}
+	return false
+}
+
+func extractRawValue(data map[string]any, fieldName string, asLines bool) (string, error) {
 	v, ok := data[fieldName]
 	if !ok {
 		return "", fmt.Errorf("--bare: field %q was not produced", fieldName)
 	}
 	switch val := v.(type) {
 	case []any:
+		if asLines {
+			var b strings.Builder
+			for _, line := range val {
+				fmt.Fprintln(&b, line)
+			}
+			return b.String(), nil
+		}
 		if len(val) != 1 {
 			return "", fmt.Errorf("--bare: field %q matched %d values, want exactly 1", fieldName, len(val))
 		}
@@ -140,7 +163,7 @@ func runJobToDir(ctx context.Context, runner JobRunner, spec *jobspec.Spec, bare
 		return 0, cerr
 	}
 
-	entries, err := writeDirOutputs(tmpPath, outDir, bare, fieldName, result.Errors, result.SkippedURLs)
+	entries, err := writeDirOutputs(tmpPath, outDir, bare, fieldName, bareListField(spec, fieldName), result.Errors, result.SkippedURLs)
 	if err != nil {
 		return 0, newCLIError(exitcode.Fatal, "%v", err)
 	}
@@ -151,7 +174,7 @@ func runJobToDir(ctx context.Context, runner JobRunner, spec *jobspec.Spec, bare
 	return code, nil
 }
 
-func writeDirOutputs(ndjsonPath, outDir string, bare bool, fieldName string, failureLines, skippedLines []string) ([]dirIndexEntry, error) {
+func writeDirOutputs(ndjsonPath, outDir string, bare bool, fieldName string, asLines bool, failureLines, skippedLines []string) ([]dirIndexEntry, error) {
 	data, err := os.ReadFile(ndjsonPath) //nolint:gosec // ndjsonPath is this command's own os.MkdirTemp file, not user-controlled input
 	if err != nil {
 		return nil, err
@@ -182,13 +205,17 @@ func writeDirOutputs(ndjsonPath, outDir string, bare bool, fieldName string, fai
 		if fieldName == "" {
 			value = item.Body
 		} else {
-			value, err = extractRawValue(item.Data, fieldName)
+			value, err = extractRawValue(item.Data, fieldName, asLines)
 			if err != nil {
 				entries = append(entries, dirIndexEntry{URL: item.URL, Status: item.Status, Error: fmt.Sprintf("%s: %v", item.URL, err)})
 				continue
 			}
 		}
-		fileName := fmt.Sprintf("%04d.html", n)
+		ext := "html"
+		if asLines {
+			ext = "txt"
+		}
+		fileName := fmt.Sprintf("%04d.%s", n, ext)
 		if err := os.WriteFile(filepath.Join(outDir, fileName), []byte(value), 0o600); err != nil {
 			return nil, err
 		}

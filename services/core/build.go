@@ -14,6 +14,7 @@ import (
 	"github.com/Decodo/pobear/services/core/internal/job"
 	"github.com/Decodo/pobear/services/core/internal/job/workers"
 	"github.com/Decodo/pobear/services/core/internal/job/workers/crawl"
+	"github.com/Decodo/pobear/services/core/internal/links"
 	"github.com/Decodo/pobear/services/core/internal/sink"
 	"github.com/Decodo/pobear/services/core/internal/sink/sinks"
 	"github.com/Decodo/pobear/services/core/internal/stage"
@@ -51,7 +52,7 @@ func (e *liveExecutor) Run(ctx context.Context, spec *jobspec.Spec) (job.Result,
 	stager := e.createStager()
 	sinker := sink.NewEmptyCounter(e.createSinker(spec), len(spec.Stages) > 0)
 
-	scrapeWorker := workers.NewScrape(fetcher, stager, sinker, workers.HTMLLinks{})
+	scrapeWorker := workers.NewScrape(fetcher, stager, sinker, links.HTML{})
 	robotsChecker := crawl.NewHTTPRobotsChecker(http.DefaultClient)
 	sitemapFetcher := crawl.NewHTTPSitemapFetcher(http.DefaultClient)
 	crawlWorker := crawlAdapter{crawl: crawl.NewCrawl(scrapeWorker, robotsChecker, sitemapFetcher)}
@@ -101,6 +102,7 @@ func (*liveExecutor) createStager() *stage.Stager {
 		"raw":      extractors.Raw{},
 		"markdown": extractors.Markdown{},
 		"css":      extractors.CSS{},
+		"links":    extractors.Links{},
 	}
 	stager := stage.NewStager(extractorMap)
 	return stager

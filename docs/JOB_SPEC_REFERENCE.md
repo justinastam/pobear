@@ -229,22 +229,46 @@ order-dependent overwrite to reason about either.
 | `raw` | — | `data.raw`: the untouched body |
 | `markdown` | — | `data.markdown`: HTML converted to Markdown |
 | `css` | `fields: {name: "selector"}` or `{name: "selector@attr"}` | `data[name]` per field — always a list of every matching element's value, in document order; `[]` if nothing matched |
+| `links` | optional `include: [glob]`, `exclude: [glob]` | `data.links`: every link on the page as an absolute URL, deduplicated, in document order; `[]` if none |
 | `plugin` | `id: "<registered id>"` | whatever the host callback returns |
 
 **Rules:**
-- `use` must be one of the four names above; anything else is rejected at load time.
+- `use` must be one of the five names above; anything else is rejected at load time.
+- `include`/`exclude` are only valid on a `links` stage; setting either on any
+  other stage is a validation error naming the field, never a silent no-op.
 - A `plugin` stage is rejected outside `__rpc` mode (there is no reverse channel to
   answer it in plain CLI mode) — a clear error, not a hang. `__rpc` mode is
   deferred (see §5), so in practice `plugin` is unreachable in v1.
 - Two stages writing the same `data` key is rejected at load time, naming both
   stages involved by position — the same as any other invalid spec, never a
   silent overwrite and never something that reaches a running job. This is
-  checkable statically for `raw`/`markdown`/`css` (their output keys are fully
+  checkable statically for `raw`/`markdown`/`css`/`links` (their output keys are fully
   determined by their own config: a fixed name, or `fields`'s own keys), so it
   never depends on what the fetched body actually contains. A `plugin` stage's
   output key is decided by the host callback at runtime, so it's exempt from
   this check — moot in practice today since `plugin` is unreachable outside
   `__rpc` mode (deferred, see §5).
+
+**`links`:** discovers links exactly the way a crawl does (§3.2's **Link
+discovery**): every `<a href>`, resolved against the page's own final URL (after
+redirects), with anything that isn't `http`/`https` once resolved silently
+dropped. A URL that appears more than once is kept only at its first position;
+two URLs are duplicates only when their resolved strings are identical (no
+fragment or query canonicalization, unlike a crawl's dedup). `include`/`exclude`
+are globs with the same syntax and semantics as `source.crawl.include`/`exclude`
+(§9): matched against the full URL, `exclude` wins over `include`, and an empty
+`include` keeps everything. They filter only this stage's `data.links` — they
+have nothing to do with which pages a crawl follows. The stage is meant for
+building URL lists: `pobear scrape <url> --extract links --bare` prints one URL
+per line, ready to feed back into `pobear scrape <file>`
+(`CLI_REFERENCE.md`'s `--bare`).
+
+```yaml
+stages:
+  - use: links
+    include: ["**/catalogue/**"]
+    exclude: ["**/category/**"]
+```
 
 A textual response body is decoded to UTF-8 using whatever charset the response
 declares — the `Content-Type` header, a BOM, or a `<meta charset>` tag — so a
@@ -318,8 +342,10 @@ a crawl:
   that doesn't match `pattern`; an `int` value outside `min`/`max`.
 - `limits`: any field `<= 0` where the rule requires `> 0`; `backoff` not
   `exponential`; negative `rps`.
-- `stages[].use` not one of the four known extraction-method names; a stage using
-  `plugin` outside `__rpc` mode; a stage using `css` with no `fields`.
+- `stages[].use` not one of the five known extraction-method names; a stage using
+  `plugin` outside `__rpc` mode; a stage using `css` with no `fields`;
+  `include`/`exclude` on a stage not using `links`; a malformed `include`/`exclude`
+  glob on a `links` stage.
 - `sink.use` outside its enum; `path` missing when required, or present when
   forbidden; `sink.use: stream` outside `__rpc` mode.
 
@@ -332,7 +358,7 @@ a crawl:
   each followed by a unit — `ms`, `s`, `m`, `h` — e.g. `"500ms"`, `"30s"`, `"10m"`,
   `"1h30m"`. An empty string means "no limit" wherever that's meaningful
   (`maxDuration`); it is never valid for `timeout`.
-- **Globs** (`include`, `exclude`) match against the **full URL** — scheme, host,
+- **Globs** (`include`, `exclude` — on `source.crawl` and on a `links` stage) match against the **full URL** — scheme, host,
   path, and query string together as one string — not just the path. `**` matches
   across `/` (e.g. `**/blog/**` matches any depth under `/blog/` on any host), and
   standard single-segment `*` (anything but `/`) and `?` (exactly one character)
@@ -395,6 +421,9 @@ stages:
   - use: markdown
   - use: css
     fields: { title: "h1", price: ".price@text" }
+  - use: links
+    include: ["**/blog/**"]
+    exclude: ["**/tag/**"]
 
 sink:
   use: ndjson

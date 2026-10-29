@@ -10,7 +10,7 @@ import (
 )
 
 type Extractor interface {
-	Run(ctx context.Context, body []byte, cfg jobspec.Stage) ([]extractors.Result, error)
+	Run(ctx context.Context, body []byte, pageURL string, cfg jobspec.Stage) ([]extractors.Result, error)
 }
 
 var ErrUnknownExtractor = errors.New("stage: unknown extractor")
@@ -23,7 +23,7 @@ func NewStager(exts map[string]Extractor) *Stager {
 	return &Stager{extractors: exts}
 }
 
-func (s *Stager) Run(ctx context.Context, body []byte, cfgs []jobspec.Stage) (data map[string]any, err error) {
+func (s *Stager) Run(ctx context.Context, body []byte, pageURL string, cfgs []jobspec.Stage) (data map[string]any, err error) {
 	data = make(map[string]any)
 
 	for _, cfg := range cfgs {
@@ -32,7 +32,7 @@ func (s *Stager) Run(ctx context.Context, body []byte, cfgs []jobspec.Stage) (da
 			return nil, fmt.Errorf("%w: %q", ErrUnknownExtractor, cfg.Use)
 		}
 
-		results, err := ext.Run(ctx, body, cfg)
+		results, err := ext.Run(ctx, body, pageURL, cfg)
 		if err != nil {
 			return nil, err
 		}

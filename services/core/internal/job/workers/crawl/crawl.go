@@ -8,14 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bmatcuk/doublestar/v4"
-
 	"github.com/Decodo/pobear/pkg/fault"
 	"github.com/Decodo/pobear/pkg/jobresult"
 	"github.com/Decodo/pobear/pkg/jobspec"
 	"github.com/Decodo/pobear/services/core/internal/fetch/tiers"
 	"github.com/Decodo/pobear/services/core/internal/job/pool"
 	"github.com/Decodo/pobear/services/core/internal/job/workers"
+	"github.com/Decodo/pobear/services/core/internal/links"
 )
 
 type ScrapeWorker interface {
@@ -194,7 +193,7 @@ func (c *Crawl) shouldSkip(ctx context.Context, entry frontierEntry, cs *jobspec
 	if !inScope(entry.url, entry.origin, cs.Scope) {
 		return "out of scope", true
 	}
-	if !matchesIncludeExclude(entry.url, cs.Include, cs.Exclude) {
+	if !links.MatchesIncludeExclude(entry.url, cs.Include, cs.Exclude) {
 		return "excluded by --include/--exclude", true
 	}
 	if cs.Robots == "respect" && c.robots != nil {
@@ -222,21 +221,4 @@ func inScope(candidateURL, origin, scope string) bool {
 		return host == origin || strings.HasSuffix(host, "."+origin)
 	}
 	return host == origin
-}
-
-func matchesIncludeExclude(candidateURL string, include, exclude []string) bool {
-	for _, pattern := range exclude {
-		if ok, _ := doublestar.Match(pattern, candidateURL); ok {
-			return false
-		}
-	}
-	if len(include) == 0 {
-		return true
-	}
-	for _, pattern := range include {
-		if ok, _ := doublestar.Match(pattern, candidateURL); ok {
-			return true
-		}
-	}
-	return false
 }

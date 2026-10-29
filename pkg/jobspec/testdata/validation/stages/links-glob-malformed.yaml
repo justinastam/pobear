@@ -1,0 +1,8 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local}
+  stages: [{use: links, exclude: ["[unterminated"]}]
+wantErr: true
+wantField: stages[0].exclude
+wantMessage: "`stages[0].exclude` is not a valid glob pattern: \"[unterminated\""

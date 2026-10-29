@@ -23,6 +23,7 @@ import (
 	"github.com/Decodo/pobear/services/core/internal/job"
 	"github.com/Decodo/pobear/services/core/internal/job/workers"
 	"github.com/Decodo/pobear/services/core/internal/job/workers/crawl"
+	"github.com/Decodo/pobear/services/core/internal/links"
 	"github.com/Decodo/pobear/services/core/internal/sink"
 	"github.com/Decodo/pobear/services/core/internal/sink/sinks"
 	"github.com/Decodo/pobear/services/core/internal/stage"
@@ -97,13 +98,14 @@ func buildService(client *http.Client, ndjsonPath string) *core.Service {
 		"raw":      extractors.Raw{},
 		"markdown": extractors.Markdown{},
 		"css":      extractors.CSS{},
+		"links":    extractors.Links{},
 	}
 	stager := stage.NewStager(extractorMap)
 
 	sinkMap := map[string]sink.Sink{"ndjson": &sinks.NDJSON{Path: ndjsonPath}}
 	sinker := sink.NewSinker(sinkMap, "ndjson")
 
-	scrape := workers.NewScrape(fetcher, stager, sinker, workers.HTMLLinks{})
+	scrape := workers.NewScrape(fetcher, stager, sinker, links.HTML{})
 	robotsChecker := crawl.NewHTTPRobotsChecker(client)
 	sitemapFetcher := crawl.NewHTTPSitemapFetcher(client)
 	crawlWorker := crawlAdapter{crawl: crawl.NewCrawl(scrape, robotsChecker, sitemapFetcher)}

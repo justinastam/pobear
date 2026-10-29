@@ -53,7 +53,7 @@ $ pobear scrape urls.txt --print-spec
 | `--geo <code>` | — | sugar for `--opt geo=<code>` |
 | `--opt name=value` | — | repeatable; set any option the chosen provider declares — see below |
 | `-t, --timeout <duration>` | `30s` | per-request timeout |
-| `-e, --extract raw\|markdown` | — | add an extraction stage |
+| `-e, --extract raw\|markdown\|links` | — | add an extraction stage |
 | `--css name=selector[@attr]` | — | repeatable; each field name must be non-empty and set at most once |
 | `-H, --header "name: value"` | — | repeatable; sets `fetch.headers` (`JOB_SPEC_REFERENCE.md` §4) — each name must be non-empty and set at most once |
 | `-o, --out <path>` | stdout | write NDJSON to a file, or one file per target plus an `index.json` if `<path>` is a directory — see below |
@@ -158,6 +158,19 @@ $ pobear scrape https://example.com --css 'title=h1' --css 'link=a@href'
 {"url":"https://example.com", …, "data":{"title":["Example Domain"],"link":["https://www.iana.org/domains/example"]}}
 ```
 
+`--extract links` adds a `links` stage (`JOB_SPEC_REFERENCE.md` §6): every link
+on the page, resolved to an absolute URL against the page's final URL,
+deduplicated, in document order — non-`http(s)` links (`mailto:`, `javascript:`)
+are dropped. Unlike `--css 'link=a@href'`, relative hrefs come back absolute, so
+the list can be fed straight back into `pobear scrape <file>` (see `--bare`
+below). Filtering by `include`/`exclude` globs is a job-spec-only option on the
+stage; there's no flag for it.
+
+```
+$ pobear scrape https://books.toscrape.com/ --extract links
+{"url":"https://books.toscrape.com/", …, "data":{"links":["https://books.toscrape.com/index.html","https://books.toscrape.com/catalogue/category/books_1/index.html", …]}}
+```
+
 ### `-H, --header` — extra request headers
 
 Repeatable, `"name: value"` shape (curl's own `-H` convention), each name set at
@@ -194,8 +207,9 @@ $ pobear crawl https://example.com --depth 2 --css 'price=.price'
 fetched 200, errors 0, skipped 0, empty 200
 ```
 
-A css field that matched nothing writes an empty list, and `raw`/`markdown` write
-an empty string; either counts as empty. An item is only empty when **every**
+A css field that matched nothing and a `links` stage that found no links both
+write an empty list, and `raw`/`markdown` write an empty string; any of these
+counts as empty. An item is only empty when **every**
 field came back empty — one field matching is enough to count it as extracted.
 
 This is the closest pobear gets to reporting a soft block it doesn't recognize. A
@@ -275,6 +289,20 @@ $ echo $?
 3
 ```
 
+`--extract links` is the one list `--bare` doesn't reduce to a single element:
+it prints every URL on its own line (each newline-terminated; nothing at all if
+the page had no links), so the output is directly a URL file `scrape` accepts:
+
+```
+$ pobear scrape https://books.toscrape.com/ --extract links --bare > urls.txt
+fetched 1, errors 0, skipped 0          # ← stderr
+$ head -3 urls.txt
+https://books.toscrape.com/index.html
+https://books.toscrape.com/catalogue/category/books_1/index.html
+https://books.toscrape.com/catalogue/category/books/travel_2/index.html
+$ pobear scrape urls.txt --css 'title=h1' --out books.ndjson
+```
+
 The "exactly one URL" half of the rule is checked just as early, before any
 fetch: a `urls.txt` naming more than one URL is rejected the same way, for
 the same reason (`scrape <url|file>` is the only way to hand `--bare` more
@@ -312,7 +340,8 @@ In directory mode, every target gets its own file, named by a sequential,
 zero-padded index in fetch order (`0001`, `0002`, …), not by URL — URLs can
 collide or contain characters that are awkward as filenames. Without `--bare`,
 each file is that target's full NDJSON line (`0001.json`); with `--bare`, each
-file holds just the extracted value (`0001.html`). Unlike file mode, `--bare`
+file holds just the extracted value (`0001.html`; `0001.txt` for
+`--extract links`, one URL per line). Unlike file mode, `--bare`
 in directory mode does not require exactly one target — and a single item's
 extraction failing (its field missing, or a `--css` match producing 0 or 2+
 elements) only fails that one entry, not the whole run.
@@ -722,7 +751,7 @@ as CLI's default `--extract ""`).
 │   › Local          — not set     (enter to configure)                                │
 │      Proxy          — not set     (enter to configure)                               │
 │      Provider        — not set     (enter to configure)                              │
-│      Extract       bare        (bare / raw / markdown / css fields)                  │
+│      Extract       bare        (bare / raw / markdown / links / css fields)          │
 │      Concurrency   8                                                                 │
 │      Retries       3                                                                 │
 │                                                                                      │
@@ -831,11 +860,11 @@ Local/Proxy/Provider` instead of starting.
 
 Moving `Extract` to `css fields` replaces the single-line field with an editable
 list; `bare` and `raw` return the fetched body untouched (`bare` strips the
-result envelope in item detail too, `raw` keeps it), and `markdown` adds a
-markdown-conversion stage with no further fields:
+result envelope in item detail too, `raw` keeps it), and `markdown` and `links`
+each add their stage with no further fields:
 
 ```
-│   Extract     › css fields               (bare / raw / markdown / css fields)        │
+│   Extract     › css fields               (bare / raw / markdown / links / css fields)│
 │     title         h1                                                                 │
 │     price         .price@data-value                                                  │
 │     + add field                                                                      │
@@ -855,7 +884,7 @@ markdown-conversion stage with no further fields:
 │      Scope           same-host   (same-host / same-domain / any)                     │
 │      Sitemap         true        (also seed from /sitemap.xml)                       │
 │      Robots          respect     (respect / ignore robots.txt)                       │
-│      Extract         bare        (bare / raw / markdown / css fields)                │
+│      Extract         bare        (bare / raw / markdown / links / css fields)        │
 │      Per-host rps    16          (0 = unlimited; default differs from Scrape)        │
 │      Concurrency     8                                                               │
 │      Retries         3                                                               │
@@ -916,7 +945,7 @@ be deleted from here — there's no file to remove.
 | Template (on the Provider tier screen, multi-template providers only) | `fetch.template` |
 | provider-declared fields (e.g. Headless / Geo, on the Provider tier screen) | `fetch.options.<name>` (provider only, per-manifest, per-template) |
 | Extract (`bare`/`raw`) | no stage added; `bare` also strips the envelope in item detail (CLI equivalent: `--bare`) |
-| Extract (`markdown`/`css fields`) | a stage in the pipeline (`markdown` / `css`) |
+| Extract (`markdown`/`links`/`css fields`) | a stage in the pipeline (`markdown` / `links` / `css`) |
 | Max pages (crawl only) | `source.crawl.maxPages` |
 | Sitemap (crawl only) | `source.crawl.sitemap` |
 | Robots (crawl only) | `source.crawl.robots` (`respect` / `ignore`) |

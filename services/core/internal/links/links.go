@@ -1,4 +1,4 @@
-package workers
+package links
 
 import (
 	"net/url"
@@ -7,9 +7,9 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-type HTMLLinks struct{}
+type HTML struct{}
 
-func (HTMLLinks) Extract(body []byte, baseURL string) []string {
+func (HTML) Extract(body []byte, baseURL string) []string {
 	base, err := url.Parse(baseURL)
 	if err != nil {
 		return nil

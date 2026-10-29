@@ -22,7 +22,7 @@ func TestRawRun(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			r := extractors.Raw{}
-			results, err := r.Run(context.Background(), []byte(c.body), jobspec.Stage{Use: "raw"})
+			results, err := r.Run(context.Background(), []byte(c.body), "https://a.test/", jobspec.Stage{Use: "raw"})
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}

@@ -25,14 +25,16 @@ func (f *fakeFetcher) Fetch(_ context.Context, _ jobspec.Fetch, url string) (*ti
 }
 
 type fakeStager struct {
-	data    map[string]any
-	err     error
-	gotBody []byte
-	calls   int
+	data       map[string]any
+	err        error
+	gotBody    []byte
+	gotPageURL string
+	calls      int
 }
 
-func (f *fakeStager) Run(_ context.Context, body []byte, _ []jobspec.Stage) (map[string]any, error) {
+func (f *fakeStager) Run(_ context.Context, body []byte, pageURL string, _ []jobspec.Stage) (map[string]any, error) {
 	f.gotBody = body
+	f.gotPageURL = pageURL
 	f.calls++
 	return f.data, f.err
 }
@@ -135,6 +137,21 @@ func TestScrapePassesFetchedBodyToStager(t *testing.T) {
 	}
 	if string(stager.gotBody) != "the body" {
 		t.Fatalf("stager received body %q, want %q", stager.gotBody, "the body")
+	}
+}
+
+func TestScrapePassesFinalURLToStager(t *testing.T) {
+	fetcher := &fakeFetcher{result: &tiers.Result{Status: 200, Body: []byte("the body"), FinalURL: "https://a.test/final"}}
+	stager := &fakeStager{data: map[string]any{}}
+
+	s := workers.NewScrape(fetcher, stager, &fakeSinker{}, &fakeLinkExtractor{})
+	_, _, _, err := s.Run(context.Background(), &jobspec.Spec{}, "https://a.test", "", 0, nil)
+
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if stager.gotPageURL != "https://a.test/final" {
+		t.Fatalf("stager received pageURL %q, want the fetch's FinalURL %q (a links stage must resolve against where the page actually ended up)", stager.gotPageURL, "https://a.test/final")
 	}
 }
 
