@@ -1,0 +1,5 @@
+args: scrape {{base}}/page.html --append
+stdout: ""
+stderr: |
+    pobear: --append requires --out <file>
+exit: 3

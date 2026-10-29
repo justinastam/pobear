@@ -11,7 +11,12 @@ func parseSource(root map[string]any) (Source, *ValidationError) {
 	if !ok {
 		return Source{}, utils.Errorf("source", "`source` is required")
 	}
-	m, err := utils.AsMapping(raw, "source", "urls", "crawl")
+	m, err := utils.AsMapping(raw, "source", "urls", "crawl", "skipSeen")
+	if err != nil {
+		return Source{}, err
+	}
+
+	skipSeen, err := parseSkipSeen(m)
 	if err != nil {
 		return Source{}, err
 	}
@@ -28,14 +33,29 @@ func parseSource(root map[string]any) (Source, *ValidationError) {
 		if err != nil {
 			return Source{}, err
 		}
-		return Source{URLs: urls}, nil
+		return Source{URLs: urls, SkipSeen: skipSeen}, nil
 	default:
 		crawl, err := parseCrawlSource(m["crawl"])
 		if err != nil {
 			return Source{}, err
 		}
-		return Source{Crawl: crawl}, nil
+		return Source{Crawl: crawl, SkipSeen: skipSeen}, nil
 	}
+}
+
+func parseSkipSeen(m map[string]any) (string, *ValidationError) {
+	raw, ok := m["skipSeen"]
+	if !ok {
+		return "", nil
+	}
+	path, ok := raw.(string)
+	if !ok {
+		return "", utils.Errorf("source.skipSeen", "`source.skipSeen` must be a file path, got %v", raw)
+	}
+	if path == "" {
+		return "", utils.Errorf("source.skipSeen", "`source.skipSeen` must not be empty")
+	}
+	return path, nil
 }
 
 func parseCrawlSource(raw any) (*CrawlSource, *ValidationError) {

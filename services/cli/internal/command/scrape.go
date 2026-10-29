@@ -103,6 +103,10 @@ func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Pr
 	if f.out != "" && !isDirOut(f.out) {
 		sinkUse, sinkPath = "ndjson", f.out
 	}
+	appendOut, cerr := resolveResume(f)
+	if cerr != nil {
+		return 0, cerr
+	}
 
 	profile, cerr := resolveProfile(f, fetchUse)
 	if cerr != nil {
@@ -118,6 +122,7 @@ func scrapeRun(ctx context.Context, runner JobRunner, providers *providerator.Pr
 		URLs: urls, FetchUse: fetchUse, Ladder: f.ladder, Proxy: f.proxy, Provider: f.provider, Template: f.template,
 		Profile: profile, Options: fetchOptions, Timeout: f.timeout, Headers: headers, Stages: stages,
 		Concurrency: &f.concurrency, RPS: &f.rps, Retries: &f.retries, SinkUse: sinkUse, SinkPath: sinkPath,
+		SinkAppend: appendOut, SkipSeen: f.skipSeen,
 	}
 	defaultsIn := jobgen.Input{URLs: urls, FetchUse: "local"}
 

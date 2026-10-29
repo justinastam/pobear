@@ -3,6 +3,7 @@ package jobspec
 import (
 	"bytes"
 	"io"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 
@@ -57,6 +58,9 @@ func Parse(data []byte, mode Mode) (*Spec, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := checkSkipSeenSink(source, sink); err != nil {
+		return nil, err
+	}
 
 	return &Spec{
 		Version: version,
@@ -101,4 +105,17 @@ func parseVersion(root map[string]any) (int, *ValidationError) {
 		return 0, utils.Errorf("version", "`version` must be 1, got %v", v)
 	}
 	return n, nil
+}
+
+// checkSkipSeenSink rejects a spec whose sink would truncate the very file
+// source.skipSeen resumes from: the seen set is read before the first write,
+// so the only safe way to share one file is appending to it.
+func checkSkipSeenSink(source Source, sink Sink) *ValidationError {
+	if source.SkipSeen == "" || sink.Path == "" {
+		return nil
+	}
+	if filepath.Clean(source.SkipSeen) != filepath.Clean(sink.Path) || sink.Append {
+		return nil
+	}
+	return utils.Errorf("sink.append", "`sink.path` is the same file as `source.skipSeen`, which requires `sink.use: ndjson` with `sink.append: true` -- otherwise this run would overwrite the results it is resuming from")
 }

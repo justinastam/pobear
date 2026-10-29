@@ -15,6 +15,7 @@ import (
 	"github.com/Decodo/pobear/pkg/jobspec"
 	"github.com/Decodo/pobear/services/core/internal/fetch/tiers"
 	"github.com/Decodo/pobear/services/core/internal/job/pool"
+	"github.com/Decodo/pobear/services/core/internal/job/seen"
 	"github.com/Decodo/pobear/services/core/internal/job/workers"
 )
 
@@ -52,6 +53,10 @@ type frontierEntry struct {
 
 func (c *Crawl) Run(ctx context.Context, spec *jobspec.Spec) (Result, error) {
 	cs := spec.Source.Crawl
+	seenSet, err := seen.Load(spec.Source.SkipSeen, workers.HTMLLinks{})
+	if err != nil {
+		return Result{}, err
+	}
 	deadline := crawlDeadline(cs)
 	dd := newDedupe()
 
@@ -61,6 +66,7 @@ func (c *Crawl) Run(ctx context.Context, spec *jobspec.Spec) (Result, error) {
 	dispatched := 0
 
 	var visit func(entry frontierEntry)
+	var follow func(entry frontierEntry, links []string)
 	visit = func(entry frontierEntry) {
 		if !deadline.IsZero() && time.Now().After(deadline) {
 			return
@@ -87,6 +93,14 @@ func (c *Crawl) Run(ctx context.Context, spec *jobspec.Spec) (Result, error) {
 		}
 		mu.Unlock()
 		if overBudget {
+			return
+		}
+
+		if links, ok := seenSet.Links(entry.url); ok {
+			mu.Lock()
+			result.Seen++
+			mu.Unlock()
+			follow(entry, links)
 			return
 		}
 
@@ -135,6 +149,9 @@ func (c *Crawl) Run(ctx context.Context, spec *jobspec.Spec) (Result, error) {
 		result.Items = append(result.Items, jobresult.Item{URL: entry.url, Outcome: jobresult.Succeeded})
 		mu.Unlock()
 
+		follow(entry, links)
+	}
+	follow = func(entry frontierEntry, links []string) {
 		if entry.depth >= cs.Depth {
 			return
 		}

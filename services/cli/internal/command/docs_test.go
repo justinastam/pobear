@@ -64,7 +64,7 @@ func TestDocsJSONIsParseableAndCarriesTheContract(t *testing.T) {
 		t.Errorf("exit codes = %v, want %v", gotCodes, wantCodes)
 	}
 
-	wantContracts := []string{"provider-schema", "spec-round-trip", "bare-output", "empty-extraction", "soft-block"}
+	wantContracts := []string{"provider-schema", "spec-round-trip", "bare-output", "empty-extraction", "soft-block", "resume"}
 	gotContracts := make([]string, 0, len(payload.Contracts))
 	for _, c := range payload.Contracts {
 		gotContracts = append(gotContracts, c.ID)
@@ -86,7 +86,7 @@ func TestDocsItemFieldsAreTheDocumentedSet(t *testing.T) {
 		t.Fatalf("output is not valid JSON: %v", err)
 	}
 
-	want := []string{"url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier"}
+	want := []string{"url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier", "hash"}
 	if !reflect.DeepEqual(payload.Output.Item, want) {
 		t.Errorf("itemFields = %v, want %v", payload.Output.Item, want)
 	}

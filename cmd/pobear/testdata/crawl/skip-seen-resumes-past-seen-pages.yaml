@@ -1,0 +1,15 @@
+args: crawl {{base}}/index.html --depth 1 --skip-seen site.ndjson --sitemap=false
+stdout: |
+    {"url":"{{base}}/b.html","finalUrl":"{{base}}/b.html","parentUrl":"{{base}}/index.html","status":200,"body":"<h1>B</h1>","depth":1,"tier":"local","hash":"sha256:0e3ab556a09b50a60589ff4d86bb2f9986936aab4c0a32b561633f9a5c1afaef"}
+stderr: |
+    fetched 1, errors 0, skipped 0, seen 2
+exit: 0
+files:
+    site.ndjson: |-
+        {"url":"{{base}}/index.html","finalUrl":"{{base}}/index.html","parentUrl":"","status":200,"body":"<a href=\"a.html\">a</a> <a href=\"b.html\">b</a>","depth":0,"tier":"local"}
+        {"url":"{{base}}/a.html","finalUrl":"{{base}}/a.html","parentUrl":"{{base}}/index.html","status":200,"body":"<h1>A</h1>","depth":1,"tier":"local"}
+        {"url":"{{base}}/b.html","finalUrl":"{{base}}/b.ht
+fixtures:
+    index.html: <a href="a.html">a</a> <a href="b.html">b</a>
+    a.html: <h1>A</h1>
+    b.html: <h1>B</h1>

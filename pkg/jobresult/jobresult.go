@@ -24,6 +24,7 @@ type Result struct {
 	Failed      int
 	Skipped     int
 	Empty       int
+	Seen        int
 	Kinds       []fault.Kind
 	Errors      []string
 	SkippedURLs []string

@@ -69,7 +69,8 @@ stdout: |
           "body",
           "depth",
           "data",
-          "tier"
+          "tier",
+          "hash"
         ]
       },
       "contracts": [
@@ -92,6 +93,10 @@ stdout: |
         {
           "id": "soft-block",
           "summary": "a challenge page answers with HTTP 200 and real HTML, so it cannot be reported as [blocked]; `empty N` equal to the fetched count is the signal"
+        },
+        {
+          "id": "resume",
+          "summary": "`--skip-seen FILE` neither fetches nor emits a URL whose envelope is already in that earlier NDJSON output, and `seen N` in the summary counts them; every item's `hash` is `sha256:` plus the hex SHA-256 of its `body`, for diffing two runs"
         }
       ]
     }

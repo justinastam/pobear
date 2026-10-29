@@ -103,7 +103,7 @@ func (d *Docs) payload() docPayload {
 		Output: docOutput{
 			Stdout: "one NDJSON object per fetched item",
 			Stderr: "the `fetched N, errors N, skipped N` summary, and one detail line per failed URL",
-			Item:   []string{"url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier"},
+			Item:   []string{"url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier", "hash"},
 		},
 		Contracts: []docContract{
 			{
@@ -125,6 +125,10 @@ func (d *Docs) payload() docPayload {
 			{
 				ID:      "soft-block",
 				Summary: "a challenge page answers with HTTP 200 and real HTML, so it cannot be reported as [blocked]; `empty N` equal to the fetched count is the signal",
+			},
+			{
+				ID:      "resume",
+				Summary: "`--skip-seen FILE` neither fetches nor emits a URL whose envelope is already in that earlier NDJSON output, and `seen N` in the summary counts them; every item's `hash` is `sha256:` plus the hex SHA-256 of its `body`, for diffing two runs",
 			},
 		},
 	}

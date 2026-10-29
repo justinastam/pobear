@@ -1,0 +1,15 @@
+args: scrape urls.txt --skip-seen prev.ndjson
+stdout: |
+    {"url":"{{base}}/b.html","finalUrl":"{{base}}/b.html","parentUrl":"","status":200,"body":"<h1>B</h1>","depth":0,"tier":"local","hash":"sha256:0e3ab556a09b50a60589ff4d86bb2f9986936aab4c0a32b561633f9a5c1afaef"}
+stderr: |
+    fetched 1, errors 0, skipped 0, seen 1
+exit: 0
+files:
+    urls.txt: |
+        {{base}}/a.html
+        {{base}}/b.html
+    prev.ndjson: |
+        {"url":"{{base}}/a.html","finalUrl":"{{base}}/a.html","parentUrl":"","status":200,"body":"<h1>A</h1>","depth":0,"tier":"local"}
+fixtures:
+    a.html: <h1>A</h1>
+    b.html: <h1>B</h1>

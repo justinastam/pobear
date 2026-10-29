@@ -128,6 +128,38 @@ allowed through. `sitemap.xml` follows one level of `<sitemapindex>` recursion
 (an index pointing to per-section sitemaps); gzip-compressed sitemaps aren't
 supported.
 
+### 3.3 `source.skipSeen`
+
+| Type | Default | Rule |
+|---|---|---|
+| string (file path) | — (nothing skipped) | non-empty when set; valid alongside either `urls` or `crawl` |
+
+The path of an NDJSON file an earlier run wrote — one result envelope (§7) per
+line. Every envelope's `url` is "seen": this run neither fetches nor emits it.
+It's how an interrupted run resumes, and how a repeat run emits only what's new.
+
+- The file is read once, before anything is fetched or written. A file that
+  doesn't exist is an empty set — nothing seen yet — so the same spec serves
+  the first run and every resume.
+- A last line with no trailing newline that doesn't parse is the half-written
+  record of a killed run and is ignored (its URL isn't seen, so it's fetched
+  again). Any other line that isn't a JSON object with a non-empty `url` is a
+  runtime error before anything is fetched.
+- Only the `url` field is matched — the URL that was requested, not
+  `finalUrl` — using the same canonical form as crawl dedup (§3.2): fragment
+  dropped, query string canonicalized, nothing else normalized.
+- A seen URL in `urls` is dropped before dispatch. A seen URL in a crawl is
+  still subject to the frontier filters (§3.2) and still counts toward
+  `maxPages` — so a resumed crawl stops at the same total an uninterrupted one
+  would have — but instead of being fetched, its stored envelope stands in for
+  the fetch: its links are read from the envelope's `body` (resolved against
+  its `finalUrl`) and followed as usual, up to `depth`. Nothing is emitted for it.
+- A seen URL is neither `succeeded`, `failed`, nor `skipped`; the run counts it
+  separately (the CLI's `seen N`).
+
+When `skipSeen` and `sink.path` name the same file, `sink.append` must be `true`
+(§7, §8) — otherwise the run would truncate the results it's resuming from.
+
 ---
 
 ## 4. `fetch`
@@ -268,6 +300,13 @@ lets it sit alongside other fields (`css`, `markdown`) in the same `data` map.
 |---|---|---|---|
 | `use` | enum: `stdout` \| `ndjson` \| `json` \| `yaml` \| `stream` | `stdout` | anything else rejected |
 | `path` | string | — | **required** when `use` is `ndjson`/`json`/`yaml`; **rejected** when `use` is `stdout`/`stream` |
+| `append` | `bool` | `false` | `ndjson` only — **rejected** for any other `use`; `true` = add to an existing `path` instead of truncating it |
+
+Every fetched item carries a top-level `hash` field: `sha256:` followed by the
+lowercase hex SHA-256 of the item's `body`, exactly as `body` holds it (after
+charset decoding, §6). It depends on the body alone — not on `tier`, `stages`,
+or any other field — so comparing `hash` by `url` across two runs finds what
+changed.
 
 Every fetched item also carries a top-level `tier` field (`local`, `proxy`, or
 `provider`) — which tier actually served that URL, regardless of `sink.use`. It's
@@ -275,7 +314,11 @@ always present, even on a job that never sets `fetch.ladder`, in which case it's
 just `fetch.use` echoed back on every item.
 
 - `stdout` streams NDJSON to stdout.
-- `ndjson` streams NDJSON to `path` as items complete.
+- `ndjson` streams NDJSON to `path` as items complete. With `append: true` it
+  opens an existing `path` for appending instead of truncating it (creating it
+  if missing); a last line with no trailing newline — a killed run's
+  half-written record — is dropped first, so the first new record starts on its
+  own line.
 - `json` buffers every item and writes one JSON array to `path` on completion, so a
   reader never observes a half-written array.
 - `yaml` buffers every item and writes one YAML sequence to `path` on completion —
@@ -290,7 +333,8 @@ just `fetch.use` echoed back on every item.
 - `Close` with zero items written still produces valid output: `json`/`yaml` write
   an empty array/sequence (`[]`, not `null`), and `ndjson` still creates `path` as
   an empty (0-byte) file — a downstream reader never sees a missing file just
-  because nothing was fetched.
+  because nothing was fetched. With `append: true`, an existing `path` is left
+  as it was.
 
 ---
 
@@ -304,7 +348,8 @@ a crawl:
 - A multi-document YAML file.
 - `version` missing or not `1`.
 - `source`: neither or both of `urls`/`crawl` set; empty `urls`/`seeds`; a
-  non-absolute or non-`http(s)` URL anywhere in either.
+  non-absolute or non-`http(s)` URL anywhere in either; `skipSeen` not a string,
+  or empty.
 - `source.crawl`: negative `depth`/`maxPages`; `maxDuration` not a valid duration;
   `scope`/`robots` outside their enums; malformed `include`/`exclude` globs.
 - `fetch`: a field set for a tier that doesn't support it (§4); `profile`/`use`
@@ -321,7 +366,9 @@ a crawl:
 - `stages[].use` not one of the four known extraction-method names; a stage using
   `plugin` outside `__rpc` mode; a stage using `css` with no `fields`.
 - `sink.use` outside its enum; `path` missing when required, or present when
-  forbidden; `sink.use: stream` outside `__rpc` mode.
+  forbidden; `sink.use: stream` outside `__rpc` mode; `append` not a bool, or set
+  on any `use` other than `ndjson`; `path` naming the same file as
+  `source.skipSeen` without `append: true`.
 
 ---
 
@@ -373,6 +420,7 @@ source:
     exclude: ["**/tag/**"]
     sitemap: false
     robots: respect
+  skipSeen: out.ndjson
 
 fetch:
   use: provider
@@ -399,6 +447,7 @@ stages:
 sink:
   use: ndjson
   path: out.ndjson
+  append: true
 ```
 
 ---

@@ -74,6 +74,8 @@ type commonFlags struct {
 	css              []string
 	headers          []string
 	out              string
+	appendOut        bool
+	skipSeen         string
 	bare             bool
 	ladder           bool
 	printSpec        bool
@@ -100,6 +102,8 @@ func registerCommonFlags(cmd *cobra.Command, f *commonFlags, defaultRPS int) {
 	flags.StringArrayVar(&f.css, "css", nil, "add a css extraction field as name=selector[@attr] (repeatable)")
 	flags.StringArrayVarP(&f.headers, "header", "H", nil, "add a request header as \"name: value\" (repeatable)")
 	flags.StringVarP(&f.out, "out", "o", "", "write NDJSON to this file instead of stdout, or one file per target plus an index.json if this names a directory")
+	flags.BoolVar(&f.appendOut, "append", false, "append to the --out file instead of overwriting it (implied when --skip-seen names the same file)")
+	flags.StringVar(&f.skipSeen, "skip-seen", "", "don't fetch or emit any URL already in this NDJSON output from an earlier run")
 	flags.BoolVarP(&f.bare, "bare", "b", false, "print just the extracted value, no envelope -- requires at most one field from --extract/--css (falls back to the raw fetched body if neither is set)")
 	flags.BoolVar(&f.bare, "bear", false, "alias for --bare (it wouldn't be pobear without one)")
 	_ = flags.MarkHidden("bear")

@@ -95,3 +95,81 @@ func TestNDJSONCloseWithNoWritesCreatesEmptyFile(t *testing.T) {
 		t.Fatalf("expected an empty (0-byte) file, got %d bytes:\n%s", len(got), got)
 	}
 }
+
+func TestNDJSONAppendKeepsExistingLines(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.ndjson")
+	if err := os.WriteFile(path, []byte(`{"url":"https://a.test"}`+"\n"), 0o600); err != nil {
+		t.Fatalf("seeding file: %v", err)
+	}
+	n := &sinks.NDJSON{Path: path, Append: true}
+
+	if err := n.Write(context.Background(), sinks.Item{URL: "https://b.test"}); err != nil {
+		t.Fatalf("Write: expected no error, got %v", err)
+	}
+	if err := n.Close(); err != nil {
+		t.Fatalf("Close: expected no error, got %v", err)
+	}
+
+	got, err := os.ReadFile(path) //nolint:gosec // path is a t.TempDir() path this test constructed itself
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	assertNDJSONLineURLs(t, got, []string{"https://a.test", "https://b.test"})
+}
+
+func TestNDJSONAppendDropsATruncatedLastLine(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.ndjson")
+	seed := `{"url":"https://a.test"}` + "\n" + `{"url":"https://half` + strings.Repeat("x", 5000)
+	if err := os.WriteFile(path, []byte(seed), 0o600); err != nil {
+		t.Fatalf("seeding file: %v", err)
+	}
+	n := &sinks.NDJSON{Path: path, Append: true}
+
+	if err := n.Write(context.Background(), sinks.Item{URL: "https://b.test"}); err != nil {
+		t.Fatalf("Write: expected no error, got %v", err)
+	}
+	_ = n.Close()
+
+	got, err := os.ReadFile(path) //nolint:gosec // path is a t.TempDir() path this test constructed itself
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	assertNDJSONLineURLs(t, got, []string{"https://a.test", "https://b.test"})
+}
+
+func TestNDJSONAppendCloseWithNoWritesLeavesFileIntact(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.ndjson")
+	seed := `{"url":"https://a.test"}` + "\n"
+	if err := os.WriteFile(path, []byte(seed), 0o600); err != nil {
+		t.Fatalf("seeding file: %v", err)
+	}
+	n := &sinks.NDJSON{Path: path, Append: true}
+
+	if err := n.Close(); err != nil {
+		t.Fatalf("Close: expected no error, got %v", err)
+	}
+
+	got, err := os.ReadFile(path) //nolint:gosec // path is a t.TempDir() path this test constructed itself
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if string(got) != seed {
+		t.Fatalf("file = %q, want it untouched %q", got, seed)
+	}
+}
+
+func TestNDJSONAppendCreatesAMissingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.ndjson")
+	n := &sinks.NDJSON{Path: path, Append: true}
+
+	if err := n.Write(context.Background(), sinks.Item{URL: "https://a.test"}); err != nil {
+		t.Fatalf("Write: expected no error, got %v", err)
+	}
+	_ = n.Close()
+
+	got, err := os.ReadFile(path) //nolint:gosec // path is a t.TempDir() path this test constructed itself
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	assertNDJSONLineURLs(t, got, []string{"https://a.test"})
+}

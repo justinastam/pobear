@@ -57,6 +57,8 @@ $ pobear scrape urls.txt --print-spec
 | `--css name=selector[@attr]` | — | repeatable; each field name must be non-empty and set at most once |
 | `-H, --header "name: value"` | — | repeatable; sets `fetch.headers` (`JOB_SPEC_REFERENCE.md` §4) — each name must be non-empty and set at most once |
 | `-o, --out <path>` | stdout | write NDJSON to a file, or one file per target plus an `index.json` if `<path>` is a directory — see below |
+| `--skip-seen <file>` | — | don't fetch or emit any URL whose envelope is already in this NDJSON file from an earlier run — see below |
+| `--append` | off | append to the `--out` file instead of overwriting it; implied when `--skip-seen` names the same file as `--out` |
 | `-b, --bare` | off | print just the extracted value, no envelope — see below |
 | `--print-spec` | off | print the spec, don't run it — fields still at their default are omitted, see below |
 | `--print-spec-verbose` | off | like `--print-spec`, but every field is shown fully resolved, defaults included |
@@ -149,7 +151,8 @@ same document spelled out in full.
 $ pobear scrape https://example.com --extract markdown
 {"url":"https://example.com","finalUrl":"https://example.com","parentUrl":"","status":200,
  "body":"<!doctype html>…","depth":0,
- "data":{"markdown":"# Example Domain\n\nThis domain is for use in…"},"tier":"local"}
+ "data":{"markdown":"# Example Domain\n\nThis domain is for use in…"},"tier":"local",
+ "hash":"sha256:ea8fac7c…"}
 fetched 1, errors 0, skipped 0          # ← this line is on stderr
 ```
 
@@ -219,6 +222,90 @@ $ echo $?
 
 It fires only when every fetched item was empty. A run where some items extracted
 data is a normal partial result, not a failure.
+
+### `--skip-seen <file>` — resuming an interrupted run, or emitting only new URLs
+
+`--skip-seen` reads the `url` field of every envelope in an NDJSON file an
+earlier run wrote (`--out <file>`, or redirected stdout) and neither fetches nor
+emits any of those URLs again. It sets `source.skipSeen`
+(`JOB_SPEC_REFERENCE.md` §3.3), so it works the same on `scrape`, `crawl`, and a
+spec run with `pobear run`. URLs are compared the way a crawl dedupes them:
+fragment dropped, query parameters sorted, nothing else normalized.
+
+Only URLs that made it into the file count as seen. A failed fetch is never
+written there, so a resume retries it; so is the half-written last line of a run
+that was killed mid-write, which is ignored rather than rejected. Any other line
+that isn't a result envelope (a `json`-sink array, a `--bare` value) is an error
+before anything is fetched. A file that doesn't exist yet is an empty set, so the
+same command line works for the first run and for every resume after it.
+
+Pointing `--skip-seen` and `--out` at the same file is the resume workflow, and
+implies `--append`: the run adds to the file instead of truncating it, after first
+dropping a half-written last line so the new records start on a fresh line. A
+4,000-page crawl killed partway through:
+
+```
+$ pobear crawl https://example.com --depth 3 --max-pages 4000 --out site.ndjson
+^C
+$ wc -l < site.ndjson
+    2512
+$ pobear crawl https://example.com --depth 3 --max-pages 4000 --skip-seen site.ndjson --out site.ndjson
+fetched 1488, errors 0, skipped 0, seen 2512
+$ wc -l < site.ndjson
+    4000
+```
+
+`seen N` is appended to the summary when non-zero. Seen URLs aren't counted as
+`fetched` or `skipped`, and produce no output anywhere — not on stdout, not in an
+`--out` directory's `index.json`.
+
+**In a crawl, a seen page is still traversed, just not fetched.** Its envelope
+already carries the `body` it was fetched with, so its links are read from there
+(resolved against its `finalUrl`) and followed exactly as if it had just been
+fetched — which is what lets a resumed crawl get past the pages it already has.
+A seen page still counts toward `--max-pages`, so a resume with the same flags
+stops at the same total the uninterrupted crawl would have; to collect
+`--max-pages` *new* pages on top of an earlier run, raise it by the number
+already seen.
+
+Writing to a different file instead gives just the delta — only what's new since
+the earlier run:
+
+```
+$ pobear crawl https://example.com --depth 3 --skip-seen monday.ndjson --out new-on-tuesday.ndjson
+fetched 37, errors 0, skipped 0, seen 2512
+```
+
+`--append` on its own appends to `--out` without skipping anything; it requires
+`--out <file>` (not a directory, not stdout):
+
+```
+$ pobear scrape https://example.com --append
+pobear: --append requires --out <file>
+$ echo $?
+3
+```
+
+`--skip-seen` with `--bare` (outside `--out <dir>`) is rejected: a single bare
+value has nothing to resume.
+
+### `hash` — diffing two runs
+
+Every envelope carries `hash`: `sha256:` followed by the hex SHA-256 of its
+`body`, exactly as the envelope's `body` field holds it (after charset
+decoding). Two runs fetching the same unchanged page produce the same hash, so
+finding what changed is a join on `url` and a comparison of `hash`, without
+diffing bodies:
+
+```
+$ jq -r '[.url, .hash] | @tsv' monday.ndjson  | sort > a.tsv
+$ jq -r '[.url, .hash] | @tsv' tuesday.ndjson | sort > b.tsv
+$ comm -13 a.tsv b.tsv          # new or changed pages
+https://example.com/pricing	sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08
+```
+
+`hash` covers the body only — the same page served by a different tier, or
+extracted with different stages, hashes the same.
 
 A per-URL failure prints one detail line per failure before the summary,
 naming the URL, its fault kind in brackets, and the underlying error —
@@ -510,8 +597,8 @@ $ pobear crawl https://example.com --depth 2 --print-spec-verbose
 $ pobear crawl https://example.com --depth 1 --extract markdown --out pages.ndjson
 fetched 2, errors 0, skipped 0
 $ cat pages.ndjson
-{"url":"https://example.com/","finalUrl":"https://example.com/","parentUrl":"","status":200,"body":"<!doctype html>…","depth":0,"data":{"markdown":"# Example Domain..."},"tier":"local"}
-{"url":"https://example.com/about","finalUrl":"https://example.com/about","parentUrl":"https://example.com/","status":200,"body":"<!doctype html>…","depth":1,"data":{"markdown":"# About..."},"tier":"local"}
+{"url":"https://example.com/","finalUrl":"https://example.com/","parentUrl":"","status":200,"body":"<!doctype html>…","depth":0,"data":{"markdown":"# Example Domain..."},"tier":"local","hash":"sha256:ea8fac7c…"}
+{"url":"https://example.com/about","finalUrl":"https://example.com/about","parentUrl":"https://example.com/","status":200,"body":"<!doctype html>…","depth":1,"data":{"markdown":"# About..."},"tier":"local","hash":"sha256:5d41b7e0…"}
 ```
 
 `parentUrl` is the page a URL was discovered on — empty for a seed, otherwise the
@@ -622,14 +709,14 @@ $ pobear docs --json
   "output": {
     "stdout": "one NDJSON object per fetched item",
     "stderr": "the `fetched N, errors N, skipped N` summary, and one detail line per failed URL",
-    "itemFields": ["url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier"]
+    "itemFields": ["url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier", "hash"]
   },
   "contracts": [{"id": "provider-schema", "summary": "..."}, ...]
 }
 ```
 
 Each contract carries a stable `id` — `provider-schema`, `spec-round-trip`,
-`bare-output`, `empty-extraction`, `soft-block`. The `summary` wording may be
+`bare-output`, `empty-extraction`, `soft-block`, `resume`. The `summary` wording may be
 edited; an `id` is the handle a caller keys off, so renaming one is a breaking
 change to the contract rather than a rewording.
 

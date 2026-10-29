@@ -88,7 +88,7 @@ func (a crawlAdapter) Run(ctx context.Context, spec *jobspec.Spec) (job.Result, 
 func (e *liveExecutor) createSinker(spec *jobspec.Spec) *sink.Sinker {
 	sinkMap := map[string]sink.Sink{
 		"stdout": &sinks.Stdout{Out: e.stdout},
-		"ndjson": &sinks.NDJSON{Path: spec.Sink.Path},
+		"ndjson": &sinks.NDJSON{Path: spec.Sink.Path, Append: spec.Sink.Append},
 		"json":   &sinks.JSON{Path: spec.Sink.Path},
 		"yaml":   &sinks.YAML{Path: spec.Sink.Path},
 	}

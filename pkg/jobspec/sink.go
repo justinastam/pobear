@@ -7,7 +7,7 @@ func parseSink(root map[string]any, mode Mode) (Sink, *ValidationError) {
 	if !ok {
 		return Sink{Use: "stdout"}, nil
 	}
-	m, err := utils.AsMapping(raw, "sink", "use", "path")
+	m, err := utils.AsMapping(raw, "sink", "use", "path", "append")
 	if err != nil {
 		return Sink{}, err
 	}
@@ -37,5 +37,14 @@ func parseSink(root map[string]any, mode Mode) (Sink, *ValidationError) {
 		}
 	}
 
-	return Sink{Use: use, Path: path}, nil
+	_, hasAppend := m["append"]
+	appendMode, err := utils.GetBool(m, "append", "sink.append", false)
+	if err != nil {
+		return Sink{}, err
+	}
+	if hasAppend && use != "ndjson" {
+		return Sink{}, utils.Errorf("sink.append", "`sink.append` is only allowed when `sink.use` is `ndjson`")
+	}
+
+	return Sink{Use: use, Path: path, Append: appendMode}, nil
 }
