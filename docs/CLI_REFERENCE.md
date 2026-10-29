@@ -53,7 +53,7 @@ $ pobear scrape urls.txt --print-spec
 | `--geo <code>` | — | sugar for `--opt geo=<code>` |
 | `--opt name=value` | — | repeatable; set any option the chosen provider declares — see below |
 | `-t, --timeout <duration>` | `30s` | per-request timeout |
-| `-e, --extract raw\|markdown` | — | add an extraction stage |
+| `-e, --extract raw\|markdown\|meta` | — | add an extraction stage (`JOB_SPEC_REFERENCE.md` §6) |
 | `--css name=selector[@attr]` | — | repeatable; each field name must be non-empty and set at most once |
 | `-H, --header "name: value"` | — | repeatable; sets `fetch.headers` (`JOB_SPEC_REFERENCE.md` §4) — each name must be non-empty and set at most once |
 | `-o, --out <path>` | stdout | write NDJSON to a file, or one file per target plus an `index.json` if `<path>` is a directory — see below |
@@ -194,8 +194,9 @@ $ pobear crawl https://example.com --depth 2 --css 'price=.price'
 fetched 200, errors 0, skipped 0, empty 200
 ```
 
-A css field that matched nothing writes an empty list, and `raw`/`markdown` write
-an empty string; either counts as empty. An item is only empty when **every**
+A css field that matched nothing writes an empty list, `raw`/`markdown` write
+an empty string, and `meta` writes an empty object when the page carries none of
+the metadata it looks for; each counts as empty. An item is only empty when **every**
 field came back empty — one field matching is enough to count it as extracted.
 
 This is the closest pobear gets to reporting a soft block it doesn't recognize. A
@@ -257,6 +258,30 @@ $ pobear scrape https://example.com --extract markdown --bare
 # Example Domain
 
 This domain is for use in illustrative examples...
+```
+
+`--extract meta` writes one structured value, so `--bare` prints it as indented
+JSON (keys sorted, `&`/`<`/`>` left literal) rather than a plain string:
+
+```
+$ pobear scrape https://go.dev/ --extract meta --bare
+{
+  "canonical": "https://go.dev/",
+  "description": "Go is an open source programming language that makes it simple to build secure, scalable systems.",
+  "lang": "en",
+  "og": {
+    "description": "Go is an open source programming language that makes it simple to build secure, scalable systems.",
+    "image": "https://go.dev/doc/gopher/gopher5logo.jpg",
+    "title": "The Go Programming Language",
+    "url": "https://go.dev/"
+  },
+  "title": "The Go Programming Language",
+  "twitter": {
+    "card": "summary",
+    "image": "https://go.dev/doc/gopher/gopherbelly300.jpg",
+    "site": "@golang"
+  }
+}
 ```
 
 If neither `--extract` nor `--css` is set, `--bare` falls back to the raw fetched
@@ -722,7 +747,7 @@ as CLI's default `--extract ""`).
 │   › Local          — not set     (enter to configure)                                │
 │      Proxy          — not set     (enter to configure)                               │
 │      Provider        — not set     (enter to configure)                              │
-│      Extract       bare        (bare / raw / markdown / css fields)                  │
+│      Extract       bare        (bare / raw / markdown / meta / css fields)           │
 │      Concurrency   8                                                                 │
 │      Retries       3                                                                 │
 │                                                                                      │
@@ -831,11 +856,12 @@ Local/Proxy/Provider` instead of starting.
 
 Moving `Extract` to `css fields` replaces the single-line field with an editable
 list; `bare` and `raw` return the fetched body untouched (`bare` strips the
-result envelope in item detail too, `raw` keeps it), and `markdown` adds a
-markdown-conversion stage with no further fields:
+result envelope in item detail too, `raw` keeps it), `markdown` adds a
+markdown-conversion stage with no further fields, and `meta` likewise adds a
+page-metadata stage with no further fields:
 
 ```
-│   Extract     › css fields               (bare / raw / markdown / css fields)        │
+│   Extract     › css fields               (bare / raw / markdown / meta / css fields) │
 │     title         h1                                                                 │
 │     price         .price@data-value                                                  │
 │     + add field                                                                      │
@@ -855,7 +881,7 @@ markdown-conversion stage with no further fields:
 │      Scope           same-host   (same-host / same-domain / any)                     │
 │      Sitemap         true        (also seed from /sitemap.xml)                       │
 │      Robots          respect     (respect / ignore robots.txt)                       │
-│      Extract         bare        (bare / raw / markdown / css fields)                │
+│      Extract         bare        (bare / raw / markdown / meta / css fields)         │
 │      Per-host rps    16          (0 = unlimited; default differs from Scrape)        │
 │      Concurrency     8                                                               │
 │      Retries         3                                                               │
@@ -916,7 +942,7 @@ be deleted from here — there's no file to remove.
 | Template (on the Provider tier screen, multi-template providers only) | `fetch.template` |
 | provider-declared fields (e.g. Headless / Geo, on the Provider tier screen) | `fetch.options.<name>` (provider only, per-manifest, per-template) |
 | Extract (`bare`/`raw`) | no stage added; `bare` also strips the envelope in item detail (CLI equivalent: `--bare`) |
-| Extract (`markdown`/`css fields`) | a stage in the pipeline (`markdown` / `css`) |
+| Extract (`markdown`/`meta`/`css fields`) | a stage in the pipeline (`markdown` / `meta` / `css`) |
 | Max pages (crawl only) | `source.crawl.maxPages` |
 | Sitemap (crawl only) | `source.crawl.sitemap` |
 | Robots (crawl only) | `source.crawl.robots` (`respect` / `ignore`) |

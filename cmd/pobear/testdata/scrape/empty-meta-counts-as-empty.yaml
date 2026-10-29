@@ -1,0 +1,9 @@
+args: scrape {{base}}/page.html --extract meta --fail-on-empty
+stdout: |
+    {"url":"{{base}}/page.html","finalUrl":"{{base}}/page.html","parentUrl":"","status":200,"body":"<p>no metadata here</p>","depth":0,"data":{"meta":{}},"tier":"local"}
+stderr: |
+    fetched 1, errors 0, skipped 0, empty 1
+    pobear: every fetched item extracted nothing (1 items)
+exit: 5
+fixtures:
+    page.html: <p>no metadata here</p>

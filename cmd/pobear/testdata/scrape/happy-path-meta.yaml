@@ -1,0 +1,8 @@
+args: scrape {{base}}/page.html --extract meta
+stdout: |
+    {"url":"{{base}}/page.html","finalUrl":"{{base}}/page.html","parentUrl":"","status":200,"body":"<html lang=\"en\"><head><title>Books &amp; More</title><meta property=\"og:type\" content=\"website\"></head><body></body></html>","depth":0,"data":{"meta":{"lang":"en","og":{"type":"website"},"title":"Books & More"}},"tier":"local"}
+stderr: |
+    fetched 1, errors 0, skipped 0
+exit: 0
+fixtures:
+    page.html: '<html lang="en"><head><title>Books &amp; More</title><meta property="og:type" content="website"></head><body></body></html>'

@@ -27,7 +27,7 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 
 		use, _ := m["use"].(string)
 		switch use {
-		case "raw", "markdown":
+		case "raw", "markdown", "meta":
 		case "css":
 			if _, ok := m["fields"]; !ok {
 				return nil, utils.Errorf(field+".fields", "`%s.fields` is required for a `css` stage", field)
@@ -37,7 +37,7 @@ func parseStages(root map[string]any, mode Mode) ([]Stage, *ValidationError) {
 				return nil, utils.Errorf(field+".use", "`%s.use: plugin` is only allowed under `__rpc` mode", field)
 			}
 		default:
-			return nil, utils.Errorf(field+".use", "`%s.use` must be one of `raw`, `markdown`, `css`, `plugin`, got %q", field, use)
+			return nil, utils.Errorf(field+".use", "`%s.use` must be one of `raw`, `markdown`, `meta`, `css`, `plugin`, got %q", field, use)
 		}
 
 		stage := Stage{Use: use}
@@ -84,6 +84,8 @@ func stageDataKeys(s Stage) []string {
 		return []string{"raw"}
 	case "markdown":
 		return []string{"markdown"}
+	case "meta":
+		return []string{"meta"}
 	case "css":
 		keys := make([]string, 0, len(s.Fields))
 		for k := range s.Fields {
