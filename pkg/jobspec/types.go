@@ -51,6 +51,7 @@ type Limits struct {
 type Stage struct {
 	Use    string            `yaml:"use" json:"use"`
 	Fields map[string]string `yaml:"fields,omitempty" json:"fields,omitempty"`
+	Items  string            `yaml:"items,omitempty" json:"items,omitempty"`
 	ID     string            `yaml:"id,omitempty" json:"id,omitempty"`
 }
 

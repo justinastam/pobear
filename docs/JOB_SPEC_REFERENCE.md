@@ -228,7 +228,7 @@ order-dependent overwrite to reason about either.
 |---|---|---|
 | `raw` | — | `data.raw`: the untouched body |
 | `markdown` | — | `data.markdown`: HTML converted to Markdown |
-| `css` | `fields: {name: "selector"}` or `{name: "selector@attr"}` | `data[name]` per field — always a list of every matching element's value, in document order; `[]` if nothing matched |
+| `css` | `fields: {name: "selector"}` or `{name: "selector@attr"}`; optional `items: "selector"` | without `items`: `data[name]` per field — always a list of every matching element's value, in document order; `[]` if nothing matched. With `items`: a single `data.items` list of records instead — see §6.1 |
 | `plugin` | `id: "<registered id>"` | whatever the host callback returns |
 
 **Rules:**
@@ -240,8 +240,9 @@ order-dependent overwrite to reason about either.
   stages involved by position — the same as any other invalid spec, never a
   silent overwrite and never something that reaches a running job. This is
   checkable statically for `raw`/`markdown`/`css` (their output keys are fully
-  determined by their own config: a fixed name, or `fields`'s own keys), so it
-  never depends on what the fetched body actually contains. A `plugin` stage's
+  determined by their own config: a fixed name, `fields`'s own keys, or `items`
+  for a `css` stage with `items` set), so it never depends on what the fetched
+  body actually contains. A `plugin` stage's
   output key is decided by the host callback at runtime, so it's exempt from
   this check — moot in practice today since `plugin` is unreachable outside
   `__rpc` mode (deferred, see §5).
@@ -259,6 +260,55 @@ Every fetched item already carries the untouched body in a top-level `body` fiel
 still gives you that field — `raw` doesn't fetch anything extra, it just copies the
 same content into `data.raw` too, which is what makes it eligible for `--bare` and
 lets it sit alongside other fields (`css`, `markdown`) in the same `data` map.
+
+### 6.1 `css` with `items` — one record per matched element
+
+`items` is a CSS selector that scopes the stage: every element it matches becomes
+one record (a JSON object), and every `fields` selector is evaluated *inside* that
+element instead of across the whole page. The stage then writes a single key,
+`data.items` — a list of records in document order, `[]` if `items` matched
+nothing — and none of its field names become top-level `data` keys.
+
+```yaml
+stages:
+  - use: css
+    items: "article.product_pod"
+    fields: { title: "h3 a@title", price: ".price_color", url: "h3 a@href" }
+```
+
+```json
+"data": {"items": [
+  {"price": "£51.77", "title": "A Light in the Attic", "url": "catalogue/a-light-in-the-attic_1000/index.html"},
+  {"price": "£53.74", "title": "Tipping the Velvet", "url": "catalogue/tipping-the-velvet_999/index.html"}
+]}
+```
+
+**Value of a field inside a record** — always a single scalar, never a list:
+
+- the value of the **first** descendant of the item element that matches the
+  field's selector and yields a value (its text, or its `@attr` — a match missing
+  that attribute is skipped, and the next match is tried);
+- `null` when nothing inside the item matched (or no match had the attribute) —
+  the key is still present, so every record has the same set of keys;
+- an empty selector (`"@href"`, or `""` for its text) refers to the item element
+  itself, e.g. `items: "a.result"` with `fields: { url: "@href", label: "" }`.
+
+Field selectors only see the item's descendants, so a match in one item never
+leaks into another's record. A field that legitimately matches several elements
+per item (e.g. a list of tags) keeps only the first; use a `css` stage without
+`items` when you need every match.
+
+A fetched page counts toward `empty` (the run summary, `CLI_REFERENCE.md`) only
+when no record has a non-null, non-empty field — `items: []`, or records whose
+fields are all `null`, both mean the selectors found nothing.
+
+**Rules:**
+- `items`, when present, must be a non-empty string, and is only allowed on a
+  `css` stage.
+- A `css` stage with `items` writes the data key `items`, so it collides with a
+  `css` field named `items` in another stage, or with another `items` stage
+  (§6 rules). Field names inside the stage can't collide with anything — they
+  live inside the records.
 
 ---
 
@@ -319,7 +369,8 @@ a crawl:
 - `limits`: any field `<= 0` where the rule requires `> 0`; `backoff` not
   `exponential`; negative `rps`.
 - `stages[].use` not one of the four known extraction-method names; a stage using
-  `plugin` outside `__rpc` mode; a stage using `css` with no `fields`.
+  `plugin` outside `__rpc` mode; a stage using `css` with no `fields`; `items`
+  set on a stage other than `css`, or set to an empty string.
 - `sink.use` outside its enum; `path` missing when required, or present when
   forbidden; `sink.use: stream` outside `__rpc` mode.
 
@@ -395,6 +446,9 @@ stages:
   - use: markdown
   - use: css
     fields: { title: "h1", price: ".price@text" }
+  - use: css
+    items: "article.product"         # one record per match, written to data.items
+    fields: { name: "h3", url: "a@href" }
 
 sink:
   use: ndjson

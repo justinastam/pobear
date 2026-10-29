@@ -39,6 +39,24 @@ Each fetched page becomes an NDJSON record in `books.ndjson`. The `data` field c
 
 Here, `h3 a@title` reads each book link's `title` attribute, while `.price_color` extracts the price text. Change the URL and selectors to collect the fields your workflow needs.
 
+To get one object per book instead of parallel lists, add `--items` with a selector for the element that wraps each record:
+
+```sh
+pobear scrape https://books.toscrape.com/ --items 'article.product_pod' \
+  --css 'title=h3 a@title' --css 'price=.price_color'
+```
+
+```json
+{
+  "items": [
+    { "price": "£51.77", "title": "A Light in the Attic" },
+    { "price": "£53.74", "title": "Tipping the Velvet" }
+  ]
+}
+```
+
+Each field is evaluated inside its own `article.product_pod`, so values can't drift out of line when one record is missing a field (it shows up as `null`).
+
 If you have `jq`, inspect the first record's extracted fields:
 
 ```sh

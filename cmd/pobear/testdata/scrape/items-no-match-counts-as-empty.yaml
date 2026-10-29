@@ -1,0 +1,9 @@
+args: scrape {{base}}/page.html --items article --css title=h3 --fail-on-empty
+stdout: |
+    {"url":"{{base}}/page.html","finalUrl":"{{base}}/page.html","parentUrl":"","status":200,"body":"<h1>Hello</h1><p>world</p>","depth":0,"data":{"items":[]},"tier":"local"}
+stderr: |
+    fetched 1, errors 0, skipped 0, empty 1
+    pobear: every fetched item extracted nothing (1 items)
+exit: 5
+fixtures:
+    page.html: <h1>Hello</h1><p>world</p>

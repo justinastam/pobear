@@ -49,7 +49,10 @@ func stringMapToAny(m map[string]string) map[string]any {
 	return out
 }
 
-func buildStages(extract string, css []string) ([]jobspec.Stage, *cliError) {
+func buildStages(extract string, css []string, items string) ([]jobspec.Stage, *cliError) {
+	if items != "" && len(css) == 0 {
+		return nil, newCLIError(exitcode.UsageError, "--items requires at least one --css field to extract from each matched element")
+	}
 	var stages []jobspec.Stage
 	if extract != "" {
 		stages = append(stages, jobspec.Stage{Use: extract})
@@ -69,7 +72,7 @@ func buildStages(extract string, css []string) ([]jobspec.Stage, *cliError) {
 			}
 			fields[name] = sel
 		}
-		stages = append(stages, jobspec.Stage{Use: "css", Fields: fields})
+		stages = append(stages, jobspec.Stage{Use: "css", Fields: fields, Items: items})
 	}
 	return stages, nil
 }
@@ -108,7 +111,10 @@ func extractedFieldNames(extract string, css []string) []string {
 	return names
 }
 
-func validateBare(bare bool, names []string) *cliError {
+func validateBare(bare bool, names []string, items string) *cliError {
+	if bare && items != "" {
+		return newCLIError(exitcode.UsageError, "--bare prints a single value, but --items produces a list of records -- drop --bare and read data.items instead")
+	}
 	if !bare || len(names) <= 1 {
 		return nil
 	}

@@ -57,6 +57,12 @@ func hasExtractedValue(data map[string]any) bool {
 			if len(value) > 0 {
 				return true
 			}
+		case []map[string]any:
+			for _, record := range value {
+				if hasExtractedValue(record) {
+					return true
+				}
+			}
 		default:
 			return true
 		}

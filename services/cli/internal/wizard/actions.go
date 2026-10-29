@@ -74,7 +74,7 @@ func buildStages(c extractConfig) []jobspec.Stage {
 			}
 			fields[pair.name] = pair.selector
 		}
-		return []jobspec.Stage{{Use: "css", Fields: fields}}
+		return []jobspec.Stage{{Use: "css", Fields: fields, Items: strings.TrimSpace(c.cssItems)}}
 	default:
 		return nil
 	}

@@ -1,0 +1,6 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local}
+  stages: [{use: css, fields: {title: h1}}, {use: css, items: article, fields: {title: h3}}]
+wantErr: false

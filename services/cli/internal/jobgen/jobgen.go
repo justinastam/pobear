@@ -151,6 +151,9 @@ func buildStagesDoc(stages []jobspec.Stage) []map[string]any {
 		if len(s.Fields) > 0 {
 			doc["fields"] = s.Fields
 		}
+		if s.Items != "" {
+			doc["items"] = s.Items
+		}
 		if s.ID != "" {
 			doc["id"] = s.ID
 		}

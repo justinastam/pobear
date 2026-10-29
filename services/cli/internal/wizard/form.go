@@ -29,6 +29,7 @@ func newFetchConfig() fetchConfig {
 
 type extractConfig struct {
 	extract   string
+	cssItems  string
 	cssFields []cssFieldPair
 }
 
@@ -37,6 +38,7 @@ func newExtractConfig() extractConfig {
 }
 
 const (
+	cssItemsName   = "cssItems"
 	addFieldName   = "addField"
 	saveActionName = "saveAction"
 	runActionName  = "runAction"
@@ -111,6 +113,7 @@ func extractFields(c extractConfig) []field {
 	fields := []field{extractField}
 
 	if c.extract == "css fields" {
+		fields = append(fields, textField(cssItemsName, "  Items", "(optional: one record per match)", c.cssItems))
 		for i, pair := range c.cssFields {
 			fields = append(fields,
 				textField(cssFieldName(i, "name"), "  Field name", "(ctrl+d remove)", pair.name),

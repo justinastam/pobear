@@ -120,6 +120,8 @@ func (f *scrapeForm) syncStateFromFields() {
 			f.state.providerOptions[strings.TrimPrefix(fld.name, "opt.")] = fld.value()
 		case fld.name == "extract":
 			f.state.extract = fld.value()
+		case fld.name == cssItemsName:
+			f.state.cssItems = fld.value()
 		case fld.name == "concurrency":
 			f.state.concurrency = fld.value()
 		case fld.name == "retries":

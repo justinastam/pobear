@@ -149,6 +149,8 @@ func (f *crawlForm) syncStateFromFields() {
 			f.state.robots = fld.value()
 		case fld.name == "extract":
 			f.state.extract = fld.value()
+		case fld.name == cssItemsName:
+			f.state.cssItems = fld.value()
 		case fld.name == "rps":
 			f.state.rps = fld.value()
 		case fld.name == "concurrency":

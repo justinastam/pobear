@@ -1,0 +1,5 @@
+args: scrape https://example.com --items article
+stdout: ""
+stderr: |
+    pobear: --items requires at least one --css field to extract from each matched element
+exit: 3
