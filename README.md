@@ -6,7 +6,7 @@ pobear is an open-source web scraping CLI for extracting structured data and cra
 
 It runs as a single binary, with built-in extraction and reusable scraping jobs. Start without installing a language runtime or creating an account, and keep the same extraction rules as you change fetching methods.
 
-- **Collect the fields you need**. Extract text and attributes with CSS selectors, or convert HTML to Markdown.
+- **Collect the fields you need**. Extract text and attributes with CSS selectors, convert HTML to Markdown, or pull a page's metadata and JSON-LD without writing any selectors.
 - **Build repeatable workflows**. Save commands as JSON job specs, edit them, and run them from scripts or an AI agent.
 - **Control your crawl**. Set depth, page limits, scope, and request rates, with sitemap discovery and `robots.txt` support.
 - **Use additional fetching services when needed**. Keep direct requests for accessible pages and add a proxy or Decodo for more demanding targets.
@@ -67,6 +67,16 @@ For a single page without the result envelope:
 ```sh
 pobear scrape https://go.dev/doc/ --extract markdown --bare
 ```
+
+### Read page metadata without selectors
+
+Many sites already describe themselves in their `<head>`. `--extract meta` collects the title, description, canonical URL, language, OpenGraph and Twitter card tags, and every JSON-LD block into `data.meta`:
+
+```sh
+pobear scrape https://go.dev/ --extract meta --bare
+```
+
+JSON-LD often carries product, article, or organization data as structured fields, so `data.meta.jsonld` can replace a set of CSS selectors on sites that publish it.
 
 ### Scrape a list of URLs
 

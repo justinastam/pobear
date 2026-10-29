@@ -50,9 +50,10 @@
           provider.go                // provider tier: fetch via a named manifest — auth (via pkg/credentials), request templating (via pkg/provider), response JSONPath extraction, error-kind mapping (via pkg/fault)
       /stage
         stager.go                  // stager: runs the `stages` pipeline over a fetched item, in declared order, dispatching each configured stage to the Extractor its `use` selects and merging their results into one `data` map — never has to arbitrate a key collision between two stages, since `pkg/jobspec` rejects any spec where that's possible before this ever runs
-        /extractors                 // the different extraction methods a stage's `use` can select — this is the "Extractor" interface stager dispatches to (raw/markdown/css/plugin are extraction methods, not stages themselves; a "stage" is the configured {use, ...config} pipeline slot they get plugged into)
+        /extractors                 // the different extraction methods a stage's `use` can select — this is the "Extractor" interface stager dispatches to (raw/markdown/meta/css/plugin are extraction methods, not stages themselves; a "stage" is the configured {use, ...config} pipeline slot they get plugged into)
           raw.go                      // `raw` extractor -> data.raw: the untouched body
           markdown.go                 // `markdown` extractor -> data.markdown
+          meta.go                     // `meta` extractor -> data.meta: title/description/canonical/lang, og:*/twitter:* tags, parsed ld+json blocks
           css.go                      // `css` extractor -> data[name] per selector(@attr)
           plugin.go                   // `plugin` extractor: thin adapter into pkg/plugin's pluginer; only legal under __rpc (JOB_SPEC_REFERENCE §6)
       /sink

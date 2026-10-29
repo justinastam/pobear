@@ -57,6 +57,10 @@ func hasExtractedValue(data map[string]any) bool {
 			if len(value) > 0 {
 				return true
 			}
+		case map[string]any:
+			if len(value) > 0 {
+				return true
+			}
 		default:
 			return true
 		}

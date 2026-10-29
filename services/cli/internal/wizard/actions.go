@@ -64,7 +64,7 @@ func checkProviderCredential(fc fetchConfig, providersDir, credentialsPath strin
 
 func buildStages(c extractConfig) []jobspec.Stage {
 	switch c.extract {
-	case "raw", "markdown":
+	case "raw", "markdown", "meta":
 		return []jobspec.Stage{{Use: c.extract}}
 	case "css fields":
 		fields := map[string]string{}

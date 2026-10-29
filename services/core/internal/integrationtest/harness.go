@@ -97,6 +97,7 @@ func buildService(client *http.Client, ndjsonPath string) *core.Service {
 		"raw":      extractors.Raw{},
 		"markdown": extractors.Markdown{},
 		"css":      extractors.CSS{},
+		"meta":     extractors.Meta{},
 	}
 	stager := stage.NewStager(extractorMap)
 

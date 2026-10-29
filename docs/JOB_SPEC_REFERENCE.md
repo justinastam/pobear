@@ -228,23 +228,44 @@ order-dependent overwrite to reason about either.
 |---|---|---|
 | `raw` | — | `data.raw`: the untouched body |
 | `markdown` | — | `data.markdown`: HTML converted to Markdown |
+| `meta` | — | `data.meta`: the page's metadata and structured data as one object — see **`meta` output** below |
 | `css` | `fields: {name: "selector"}` or `{name: "selector@attr"}` | `data[name]` per field — always a list of every matching element's value, in document order; `[]` if nothing matched |
 | `plugin` | `id: "<registered id>"` | whatever the host callback returns |
 
 **Rules:**
-- `use` must be one of the four names above; anything else is rejected at load time.
+- `use` must be one of the five names above; anything else is rejected at load time.
 - A `plugin` stage is rejected outside `__rpc` mode (there is no reverse channel to
   answer it in plain CLI mode) — a clear error, not a hang. `__rpc` mode is
   deferred (see §5), so in practice `plugin` is unreachable in v1.
 - Two stages writing the same `data` key is rejected at load time, naming both
   stages involved by position — the same as any other invalid spec, never a
   silent overwrite and never something that reaches a running job. This is
-  checkable statically for `raw`/`markdown`/`css` (their output keys are fully
+  checkable statically for `raw`/`markdown`/`meta`/`css` (their output keys are fully
   determined by their own config: a fixed name, or `fields`'s own keys), so it
   never depends on what the fetched body actually contains. A `plugin` stage's
   output key is decided by the host callback at runtime, so it's exempt from
   this check — moot in practice today since `plugin` is unreachable outside
   `__rpc` mode (deferred, see §5).
+
+**`meta` output.** `data.meta` is always an object. Each key below is present
+only when the page has it, so a page with no metadata at all yields `{}` (which
+counts as an empty extraction — `CLI_REFERENCE.md`'s `empty` summary):
+
+| Key | Source | Value |
+|---|---|---|
+| `title` | the `<title>` in `<head>` | string, whitespace-trimmed |
+| `description` | `<meta name="description">` (name matched case-insensitively) | string |
+| `canonical` | the first `<link rel="canonical">` (`rel` may hold other tokens too) | string, the `href` exactly as written — not resolved against the page URL |
+| `lang` | `<html lang>` | string |
+| `og` | every `<meta property="og:*">` (or `name="og:*"`) | object keyed by the name with `og:` stripped (`og:image:width` → `image:width`); a tag repeated in the page (several `og:image`) keeps its **first** value |
+| `twitter` | every `<meta name="twitter:*">` (or `property="twitter:*"`) | object, same rules as `og` |
+| `jsonld` | every `<script type="application/ld+json">`, in document order | list, one entry per block holding that block's parsed JSON as-is (an object, or a list if the block is a top-level array); whitespace-only blocks are skipped |
+| `jsonldErrors` | `ld+json` blocks that aren't valid JSON | list of strings, `"block N: <parse error>"` with `N` the 0-based position among the page's `ld+json` blocks — a broken block is recorded here and left out of `jsonld`, never a failure of the item |
+
+```yaml
+stages:
+  - use: meta
+```
 
 A textual response body is decoded to UTF-8 using whatever charset the response
 declares — the `Content-Type` header, a BOM, or a `<meta charset>` tag — so a
@@ -318,7 +339,7 @@ a crawl:
   that doesn't match `pattern`; an `int` value outside `min`/`max`.
 - `limits`: any field `<= 0` where the rule requires `> 0`; `backoff` not
   `exponential`; negative `rps`.
-- `stages[].use` not one of the four known extraction-method names; a stage using
+- `stages[].use` not one of the five known extraction-method names; a stage using
   `plugin` outside `__rpc` mode; a stage using `css` with no `fields`.
 - `sink.use` outside its enum; `path` missing when required, or present when
   forbidden; `sink.use: stream` outside `__rpc` mode.

@@ -1,0 +1,8 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local}
+  stages: [{use: meta}, {use: css, fields: {meta: h1}}]
+wantErr: true
+wantField: stages[1]
+wantMessage: "`stages[1]` (css) writes data key \"meta\", already written by `stages[0]` (meta) -- data keys must be unique across stages"

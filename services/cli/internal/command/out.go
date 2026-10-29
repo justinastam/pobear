@@ -101,9 +101,24 @@ func extractRawValue(data map[string]any, fieldName string) (string, error) {
 			return "", fmt.Errorf("--bare: field %q matched %d values, want exactly 1", fieldName, len(val))
 		}
 		return fmt.Sprint(val[0]), nil
+	case map[string]any:
+		return marshalBareJSON(val)
 	default:
 		return fmt.Sprint(val), nil
 	}
+}
+
+// marshalBareJSON renders a structured value (`meta`'s map) for --bare as
+// indented JSON, without HTML-escaping, so a title keeps its literal `&`.
+func marshalBareJSON(v any) (string, error) {
+	var buf strings.Builder
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(buf.String(), "\n"), nil
 }
 
 type dirIndexEntry struct {

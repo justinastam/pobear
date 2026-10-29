@@ -96,7 +96,7 @@ func registerCommonFlags(cmd *cobra.Command, f *commonFlags, defaultRPS int) {
 	flags.StringVar(&f.geo, "geo", "", "sugar for --opt geo=<code>")
 	flags.StringArrayVar(&f.opts, "opt", nil, "set a provider option as name=value (repeatable)")
 	flags.StringVarP(&f.timeout, "timeout", "t", "30s", "per-request timeout")
-	flags.StringVarP(&f.extract, "extract", "e", "", "add an extraction stage: raw or markdown")
+	flags.StringVarP(&f.extract, "extract", "e", "", "add an extraction stage: raw, markdown, or meta")
 	flags.StringArrayVar(&f.css, "css", nil, "add a css extraction field as name=selector[@attr] (repeatable)")
 	flags.StringArrayVarP(&f.headers, "header", "H", nil, "add a request header as \"name: value\" (repeatable)")
 	flags.StringVarP(&f.out, "out", "o", "", "write NDJSON to this file instead of stdout, or one file per target plus an index.json if this names a directory")

@@ -33,6 +33,8 @@ func TestEmptyCounterCountsItemsWithNoExtractedValue(t *testing.T) {
 		{name: "css matched something", data: map[string]any{"price": []string{"9.99"}}, want: 0},
 		{name: "empty markdown string", data: map[string]any{"markdown": ""}, want: 1},
 		{name: "non-empty markdown string", data: map[string]any{"markdown": "# Title"}, want: 0},
+		{name: "meta found nothing", data: map[string]any{"meta": map[string]any{}}, want: 1},
+		{name: "meta found a title", data: map[string]any{"meta": map[string]any{"title": "Go"}}, want: 0},
 		{name: "one of two fields matched", data: map[string]any{"a": []string{}, "b": []string{"x"}}, want: 0},
 		{name: "no data at all", data: nil, want: 1},
 	}
