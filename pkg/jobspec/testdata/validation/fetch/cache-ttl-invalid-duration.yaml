@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local, cache: {ttl: "a day"}}
+wantErr: true
+wantField: fetch.cache.ttl
+wantMessage: "`fetch.cache.ttl` is not a valid duration: \"a day\""

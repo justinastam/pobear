@@ -1,0 +1,7 @@
+input: |
+  version: 1
+  source: {urls: [https://a.test]}
+  fetch: {use: local, cache: true}
+wantErr: true
+wantField: fetch.cache
+wantMessage: "`fetch.cache` must be a mapping"

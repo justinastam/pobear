@@ -56,6 +56,8 @@ $ pobear scrape urls.txt --print-spec
 | `-e, --extract raw\|markdown` | — | add an extraction stage |
 | `--css name=selector[@attr]` | — | repeatable; each field name must be non-empty and set at most once |
 | `-H, --header "name: value"` | — | repeatable; sets `fetch.headers` (`JOB_SPEC_REFERENCE.md` §4) — each name must be non-empty and set at most once |
+| `--cache` | off | serve a repeat fetch from the on-disk response cache, store fresh successful ones — sets `fetch.cache`, see below |
+| `--cache-ttl <duration>` | `24h` | how long a cached response stays fresh — sets `fetch.cache.ttl`; requires `--cache` |
 | `-o, --out <path>` | stdout | write NDJSON to a file, or one file per target plus an `index.json` if `<path>` is a directory — see below |
 | `-b, --bare` | off | print just the extracted value, no envelope — see below |
 | `--print-spec` | off | print the spec, don't run it — fields still at their default are omitted, see below |
@@ -183,6 +185,55 @@ pobear: --header "X-Custom" is set more than once
 $ echo $?
 3
 ```
+
+### `--cache` — iterate on selectors without refetching
+
+Tuning `--css` selectors means running the same scrape over and over against
+pages that haven't changed. `--cache` stores every successful response on disk
+and serves the next fetch of the same URL, under the same fetch settings, from
+there — no network, no `--rps` wait, no retries, no provider credits:
+
+```
+$ pobear scrape https://books.toscrape.com/ --cache --css 'title=h3 a@title'
+{"url":"https://books.toscrape.com/", …, "data":{"title":["A Light in the Attic","Tipping the Velvet",…]},"tier":"local"}
+fetched 1, errors 0, skipped 0
+
+$ pobear scrape https://books.toscrape.com/ --cache --css 'price=.price_color'
+{"url":"https://books.toscrape.com/", …, "data":{"price":["£51.77","£53.74",…]},"tier":"local","cached":true}
+fetched 1, errors 0, skipped 0, cached 1
+```
+
+An item served from the cache carries `"cached":true`, and the summary appends
+`cached N` when any were. Only successful fetches are stored — a `[blocked]` or
+failed URL is fetched again next run. The cache is keyed on the URL plus the
+fetch settings that shape the response (tier, `--proxy`, `--provider`,
+`--template`, `--opt`, `--profile`, `--header`, `--ladder`, `--no-redirects`),
+so changing any of them misses; `--timeout` and the extraction flags don't, so
+`--css`/`--extract` can change freely. Credentials are never part of the key
+or the stored entry (`JOB_SPEC_REFERENCE.md` §4 has the full rule).
+
+Entries live in `$POBEAR_CACHE_DIR`, default `~/.pobear/cache`, and expire after
+`--cache-ttl` (default `24h`). `rm -rf ~/.pobear/cache` clears it. `--cache-ttl`
+without `--cache` is rejected rather than silently ignored:
+
+```
+$ pobear scrape https://example.com --cache-ttl 1h
+pobear: --cache-ttl requires --cache
+$ echo $?
+3
+```
+
+```
+$ pobear scrape https://example.com --cache --cache-ttl 1h --print-spec
+{
+  "version": 1,
+  "source": { "urls": ["https://example.com"] },
+  "fetch": { "use": "local", "cache": { "ttl": "1h" } }
+}
+```
+
+With the default TTL, `--print-spec` prints `"cache": {}` — on, every field at
+its default.
 
 ### `empty` in the summary — extraction came back with nothing
 
@@ -622,7 +673,7 @@ $ pobear docs --json
   "output": {
     "stdout": "one NDJSON object per fetched item",
     "stderr": "the `fetched N, errors N, skipped N` summary, and one detail line per failed URL",
-    "itemFields": ["url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier"]
+    "itemFields": ["url", "finalUrl", "parentUrl", "status", "body", "depth", "data", "tier", "cached"]
   },
   "contracts": [{"id": "provider-schema", "summary": "..."}, ...]
 }

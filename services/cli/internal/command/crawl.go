@@ -111,9 +111,15 @@ func crawlRun(ctx context.Context, runner JobRunner, providers *providerator.Pro
 		return 0, cerr
 	}
 
+	cacheTTL, cerr := resolveCacheTTL(f)
+	if cerr != nil {
+		return 0, cerr
+	}
+
 	resolvedIn := jobgen.Input{
 		URLs: []string{target}, Crawl: crawlIn, FetchUse: fetchUse, Ladder: f.ladder, Proxy: f.proxy, Provider: f.provider, Template: f.template,
 		Profile: profile, Options: fetchOptions, Timeout: f.timeout, NoRedirects: noRedirects, Headers: headers, Stages: stages,
+		Cache: f.cache, CacheTTL: cacheTTL,
 		Concurrency: &f.concurrency, RPS: &f.rps, Retries: &f.retries, SinkUse: sinkUse, SinkPath: sinkPath,
 	}
 	defaultsIn := jobgen.Input{

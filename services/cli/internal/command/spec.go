@@ -193,16 +193,17 @@ func printSpecOrRun(ctx context.Context, runner JobRunner, resolvedIn, defaultsI
 }
 
 type verboseFetch struct {
-	Use         string            `json:"use"`
-	Ladder      bool              `json:"ladder"`
-	Name        string            `json:"name,omitempty"`
-	Template    string            `json:"template,omitempty"`
-	Proxy       string            `json:"proxy,omitempty"`
-	Profile     string            `json:"profile,omitempty"`
-	Options     map[string]any    `json:"options,omitempty"`
-	Timeout     string            `json:"timeout,omitempty"`
-	NoRedirects bool              `json:"noRedirects"`
-	Headers     map[string]string `json:"headers,omitempty"`
+	Use         string              `json:"use"`
+	Ladder      bool                `json:"ladder"`
+	Name        string              `json:"name,omitempty"`
+	Template    string              `json:"template,omitempty"`
+	Proxy       string              `json:"proxy,omitempty"`
+	Profile     string              `json:"profile,omitempty"`
+	Options     map[string]any      `json:"options,omitempty"`
+	Timeout     string              `json:"timeout,omitempty"`
+	NoRedirects bool                `json:"noRedirects"`
+	Headers     map[string]string   `json:"headers,omitempty"`
+	Cache       *jobspec.FetchCache `json:"cache,omitempty"`
 }
 
 type verboseSpec struct {
@@ -222,6 +223,7 @@ func printJSON(spec *jobspec.Spec, stdout io.Writer) (int, *cliError) {
 			Use: spec.Fetch.Use, Ladder: spec.Fetch.Ladder, Name: spec.Fetch.Name, Template: spec.Fetch.Template,
 			Proxy: spec.Fetch.Proxy, Profile: spec.Fetch.Profile, Options: spec.Fetch.Options,
 			Timeout: spec.Fetch.Timeout, NoRedirects: spec.Fetch.NoRedirects, Headers: spec.Fetch.Headers,
+			Cache: spec.Fetch.Cache,
 		},
 		Limits: spec.Limits,
 		Stages: spec.Stages,
@@ -264,6 +266,9 @@ func execAndSummarize(ctx context.Context, runner JobRunner, data []byte, stderr
 	summary := fmt.Sprintf("fetched %d, errors %d, skipped %d", result.Succeeded, result.Failed, result.Skipped)
 	if result.Empty > 0 {
 		summary += fmt.Sprintf(", empty %d", result.Empty)
+	}
+	if result.Cached > 0 {
+		summary += fmt.Sprintf(", cached %d", result.Cached)
 	}
 	fmt.Fprintln(stderr, summary)
 	return exitcode.FromRun(result.Succeeded, result.Failed, result.Kinds), result, nil

@@ -1,0 +1,34 @@
+args: scrape {{base}}/x --cache --print-spec-verbose
+stdout: |
+    {
+      "version": 1,
+      "source": {
+        "urls": [
+          "{{base}}/x"
+        ]
+      },
+      "fetch": {
+        "use": "local",
+        "ladder": false,
+        "profile": "chrome",
+        "timeout": "30s",
+        "noRedirects": false,
+        "cache": {
+          "ttl": "24h"
+        }
+      },
+      "limits": {
+        "concurrency": 8,
+        "rps": 0,
+        "retries": 3,
+        "backoff": "exponential",
+        "pluginConcurrency": 0,
+        "pluginTimeout": "30s"
+      },
+      "stages": [],
+      "sink": {
+        "use": "stdout"
+      }
+    }
+stderr: ""
+exit: 0

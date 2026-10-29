@@ -80,3 +80,21 @@ func TestEmptyCounterClosesTheWrappedSink(t *testing.T) {
 		t.Error("Close did not reach the wrapped sink")
 	}
 }
+
+func TestCachedCounterCountsOnlyCachedItems(t *testing.T) {
+	inner := &recordingWriter{}
+	counter := sink.NewCachedCounter(inner)
+
+	for _, cached := range []bool{true, false, true} {
+		if err := counter.Write(context.Background(), sinks.Item{Cached: cached}); err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+	}
+
+	if got := counter.Cached(); got != 2 {
+		t.Errorf("Cached() = %d, want 2", got)
+	}
+	if inner.written != 3 {
+		t.Errorf("inner writes = %d, want 3 — counting must not swallow the item", inner.written)
+	}
+}

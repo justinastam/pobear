@@ -10,4 +10,5 @@ type Item struct {
 	Depth     int                 `json:"depth" yaml:"depth"`
 	Data      map[string]any      `json:"data,omitempty" yaml:"data,omitempty"`
 	Tier      string              `json:"tier" yaml:"tier"`
+	Cached    bool                `json:"cached,omitempty" yaml:"cached,omitempty"`
 }

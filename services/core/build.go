@@ -4,6 +4,9 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/Decodo/pobear/pkg/credentials"
 	"github.com/Decodo/pobear/pkg/jobspec"
@@ -49,7 +52,8 @@ func (e *liveExecutor) Run(ctx context.Context, spec *jobspec.Spec) (job.Result,
 		return job.Result{}, err
 	}
 	stager := e.createStager()
-	sinker := sink.NewEmptyCounter(e.createSinker(spec), len(spec.Stages) > 0)
+	emptyCounter := sink.NewEmptyCounter(e.createSinker(spec), len(spec.Stages) > 0)
+	sinker := sink.NewCachedCounter(emptyCounter)
 
 	scrapeWorker := workers.NewScrape(fetcher, stager, sinker, workers.HTMLLinks{})
 	robotsChecker := crawl.NewHTTPRobotsChecker(http.DefaultClient)
@@ -58,7 +62,8 @@ func (e *liveExecutor) Run(ctx context.Context, spec *jobspec.Spec) (job.Result,
 	executor := job.NewExecutor(scrapeWorker, crawlWorker, sinker)
 
 	result, runErr := executor.Run(ctx, spec)
-	result.Empty = sinker.Empty()
+	result.Empty = emptyCounter.Empty()
+	result.Cached = sinker.Cached()
 	return result, runErr
 }
 
@@ -125,7 +130,7 @@ func buildFetchClients(fetch jobspec.Fetch) (localClient, proxyClient *http.Clie
 	return localClient, proxyClient, nil
 }
 
-func (e *liveExecutor) createFetcher(manifests []*provider.Manifest, spec *jobspec.Spec) (*fetch.Fetcher, error) {
+func (e *liveExecutor) createFetcher(manifests []*provider.Manifest, spec *jobspec.Spec) (workers.Fetcher, error) {
 	localClient, proxyClient, err := buildFetchClients(spec.Fetch)
 	if err != nil {
 		return nil, err
@@ -143,5 +148,38 @@ func (e *liveExecutor) createFetcher(manifests []*provider.Manifest, spec *jobsp
 	}
 	throttle := fetch.NewThrottle(spec.Limits.RPS)
 	fetcher := fetch.NewFetcher(tierMap, spec.Limits.Concurrency, spec.Limits.Retries, fetch.Backoff, throttle)
-	return fetcher, nil
+	if spec.Fetch.Cache == nil {
+		return fetcher, nil
+	}
+	cache, err := newCache(fetcher, spec.Fetch.Cache)
+	if err != nil {
+		return nil, err
+	}
+	return cache, nil
+}
+
+// DefaultCacheDir is where fetch.cache keeps its entries: $POBEAR_CACHE_DIR,
+// else ~/.pobear/cache. Resolved only when a job actually turns the cache on,
+// so a job without it never needs a home directory.
+func DefaultCacheDir() (string, error) {
+	if dir := os.Getenv("POBEAR_CACHE_DIR"); dir != "" {
+		return dir, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".pobear", "cache"), nil
+}
+
+func newCache(next fetch.Fetching, cfg *jobspec.FetchCache) (*fetch.Cache, error) {
+	ttl, err := time.ParseDuration(cfg.TTL)
+	if err != nil {
+		return nil, err
+	}
+	dir, err := DefaultCacheDir()
+	if err != nil {
+		return nil, err
+	}
+	return fetch.NewCache(next, dir, ttl)
 }

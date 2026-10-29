@@ -1,0 +1,11 @@
+args: scrape urls.txt --cache -c 1 -r 1
+stdout: ""
+stderr: |
+    {{base}}/missing.html [http]: tiers: http status 404: 404 page not found
+    {{base}}/missing.html [http]: tiers: http status 404: 404 page not found
+    fetched 0, errors 2, skipped 0
+exit: 5
+files:
+    urls.txt: |
+        {{base}}/missing.html
+        {{base}}/missing.html
