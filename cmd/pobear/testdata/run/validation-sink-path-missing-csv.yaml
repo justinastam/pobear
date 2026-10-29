@@ -1,0 +1,10 @@
+args: run -
+stdin: |
+    version: 1
+    source: {urls: [https://a.test]}
+    fetch: {use: local}
+    sink: {use: csv}
+stdout: ""
+stderr: |
+    pobear: spec: `sink.path` is required when `sink.use` is `ndjson`, `json`, `yaml`, or `csv`
+exit: 3

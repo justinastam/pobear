@@ -56,7 +56,7 @@ $ pobear scrape urls.txt --print-spec
 | `-e, --extract raw\|markdown` | — | add an extraction stage |
 | `--css name=selector[@attr]` | — | repeatable; each field name must be non-empty and set at most once |
 | `-H, --header "name: value"` | — | repeatable; sets `fetch.headers` (`JOB_SPEC_REFERENCE.md` §4) — each name must be non-empty and set at most once |
-| `-o, --out <path>` | stdout | write NDJSON to a file, or one file per target plus an `index.json` if `<path>` is a directory — see below |
+| `-o, --out <path>` | stdout | write NDJSON to a file (CSV if `<path>` ends in `.csv`), or one file per target plus an `index.json` if `<path>` is a directory — see below |
 | `-b, --bare` | off | print just the extracted value, no envelope — see below |
 | `--print-spec` | off | print the spec, don't run it — fields still at their default are omitted, see below |
 | `--print-spec-verbose` | off | like `--print-spec`, but every field is shown fully resolved, defaults included |
@@ -306,7 +306,11 @@ $ echo $?
 in a trailing `/` (or the OS path separator) and hasn't been created yet —
 that trailing slash is how you tell the CLI "make this a directory" before it
 exists. Anything else — an existing file, or a bare path with no trailing
-slash — is file mode: a single NDJSON file, as above.
+slash — is file mode: a single file, as above — NDJSON (`sink.use: ndjson`),
+or CSV (`sink.use: csv`) if `<path>` ends in `.csv` (case-insensitive). The
+extension is the only thing that picks CSV; every other file name, including
+`.json`/`.yaml`, still gets NDJSON. `--bare` ignores the extension — it writes
+the bare value, not a CSV.
 
 In directory mode, every target gets its own file, named by a sequential,
 zero-padded index in fetch order (`0001`, `0002`, …), not by URL — URLs can
@@ -513,6 +517,22 @@ $ cat pages.ndjson
 {"url":"https://example.com/","finalUrl":"https://example.com/","parentUrl":"","status":200,"body":"<!doctype html>…","depth":0,"data":{"markdown":"# Example Domain..."},"tier":"local"}
 {"url":"https://example.com/about","finalUrl":"https://example.com/about","parentUrl":"https://example.com/","status":200,"body":"<!doctype html>…","depth":1,"data":{"markdown":"# About..."},"tier":"local"}
 ```
+
+```
+$ pobear crawl https://books.toscrape.com/ --depth 1 --max-pages 10 \
+    --include 'https://books.toscrape.com/catalogue/*/index.html' \
+    --css 'title=.product_main h1' --css 'price=.product_main .price_color' --out books.csv
+fetched 10, errors 0, skipped 64, empty 1
+$ head -6 books.csv
+url,status,tier,price,title
+https://books.toscrape.com/,200,local,,
+https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html,200,local,£51.77,A Light in the Attic
+https://books.toscrape.com/catalogue/sapiens-a-brief-history-of-humankind_996/index.html,200,local,£54.23,Sapiens: A Brief History of Humankind
+https://books.toscrape.com/catalogue/the-dirty-little-secrets-of-getting-your-dream-job_994/index.html,200,local,£33.34,The Dirty Little Secrets of Getting Your Dream Job
+https://books.toscrape.com/catalogue/the-coming-woman-a-novel-based-on-the-life-of-the-infamous-feminist-victoria-woodhull_993/index.html,200,local,£17.93,"The Coming Woman: A Novel Based on the Life of the Infamous Feminist, Victoria Woodhull"
+```
+
+The CSV columns and cell rules are the `csv` sink's — `JOB_SPEC_REFERENCE.md` §7.
 
 `parentUrl` is the page a URL was discovered on — empty for a seed, otherwise the
 `url` of whichever fetched page linked to it. Useful for debugging a crawl's shape

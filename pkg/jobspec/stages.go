@@ -78,6 +78,17 @@ func checkStageDataKeyCollisions(stages []Stage) *ValidationError {
 	return nil
 }
 
+// DataKeys lists every data key the stages write, in stage order (a css
+// stage's fields sorted by name). A plugin stage's keys are only known at
+// runtime, so it contributes none.
+func DataKeys(stages []Stage) []string {
+	var keys []string
+	for _, s := range stages {
+		keys = append(keys, stageDataKeys(s)...)
+	}
+	return keys
+}
+
 func stageDataKeys(s Stage) []string {
 	switch s.Use {
 	case "raw":

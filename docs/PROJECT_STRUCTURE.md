@@ -61,6 +61,7 @@
           stdout.go                   // stdout sink (default): streams NDJSON to stdout
           ndjson.go                   // ndjson sink: streams NDJSON to sink.path as items complete
           json.go                     // json sink: buffers every item, writes one JSON array to sink.path on completion
+          csv.go                      // csv sink: streams one row per item to sink.path; columns fixed up front from the stages' data keys
           stream.go                   // stream sink: used when a job is running over RPC — pushes items to the RPC streamer instead of a local file/stdout
 
   /cli                           // "CLI" container in the diagram

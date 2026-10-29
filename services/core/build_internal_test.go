@@ -2,10 +2,36 @@ package core
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Decodo/pobear/pkg/jobspec"
 )
+
+func TestCreateSinkerCSVTakesColumnsFromStages(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "out.csv")
+	spec := &jobspec.Spec{
+		Stages: []jobspec.Stage{
+			{Use: "css", Fields: map[string]string{"title": "h1", "price": ".price_color"}},
+			{Use: "markdown"},
+		},
+		Sink: jobspec.Sink{Use: "csv", Path: path},
+	}
+
+	sinker := (&liveExecutor{}).createSinker(spec)
+	if err := sinker.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	got, err := os.ReadFile(path) //nolint:gosec // path is a t.TempDir() path this test constructed itself
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if want := "url,status,tier,price,title,markdown\n"; string(got) != want {
+		t.Fatalf("header = %q, want %q", got, want)
+	}
+}
 
 func TestBuildFetchClientsFingerprintsProxyEvenWhenUseIsLocal(t *testing.T) {
 	fetch := jobspec.Fetch{Use: "local", Ladder: true, Profile: "chrome", Proxy: "http://p.test"}
